@@ -1,6 +1,6 @@
 
-train: /home/herve/agsolaire_ml_UNL/train_val_test_split/train
-val  : /home/herve/agsolaire_ml_UNL/train_val_test_split/val
+train: /home/sowmya/AgSolaire/train_val_test_split/train
+val  : /home/sowmya/AgSolaire/train_val_test_split/val
 
 nc   : 1
 names: ['seed']
