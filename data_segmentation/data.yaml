@@ -1,4 +1,4 @@
 names: [seed mask]
 nc: 1
-train: /home/sowmya/AgSolaire/train_val_test_split_segmentation/train
-val  : /home/sowmya/AgSolaire/train_val_test_split_segmentation/val
+train: '/home/herve/agsolaire_ml_UNL/train_val_test_split_segmentation/train'
+val  : '/home/herve/agsolaire_ml_UNL/train_val_test_split_segmentation/val'
