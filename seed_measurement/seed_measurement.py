@@ -5,7 +5,7 @@ class seed_measurement:
 
     def __init__(self,img_path, aruco_size_mm=20.0):
         self.img_path = img_path
-        self.aruco_size = aruco_size_mm
+        self.aruco_size_mm = aruco_size_mm
         pass
 
     def __calculate_pixel_to_mm_scale(self):
@@ -13,8 +13,8 @@ class seed_measurement:
 
         # Setup ArUco detector
         aruco = cv2.aruco
-        aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_50)  # choose the dict you used to print marker
-        parameters = aruco.DetectorParameters_create()
+        aruco_dict = aruco.Dictionary(aruco.DICT_4X4_50,4)  # choose the dict you used to print marker
+        parameters = aruco.DetectorParameters()
 
         corners_list, ids, rejected = aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
         if corners_list is None or len(corners_list) == 0:
@@ -46,7 +46,25 @@ class seed_measurement:
             "ids": ids
         }
     
-    def calculate_length_width_in_mm():
+    def calculate_length_width_in_mm(self):
+        pxl_mm_scale = self.__calculate_pixel_to_mm_scale()
+        return pxl_mm_scale
+        
+if __name__ == '__main__':
+    cap = cv2.VideoCapture("/dev/video2")
+    while True:
+        ret,frame = cap.read()
+        img = frame
+        # img = cv2.imread("image_with_marker.jpg")
+        cv2.imshow("testing",img)
+        obj = seed_measurement(img)
+        res = obj.calculate_length_width_in_mm()
+        # print(res)
+        print(f"Mean marker side (px): {res['mean_side_px']:.2f}")
+        print(f"Scale: {res['px_to_mm']:.6f} mm / px")
+        
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+         break
 
-        pxl_mm_scale = __calculate_pixel_to_mm_scale()
-        pass
+    cap.release()
+    cv2.destroyAllWindows()
