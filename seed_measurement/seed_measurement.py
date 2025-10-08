@@ -12,13 +12,21 @@ class seed_measurement:
         gray = cv2.cvtColor(self.img_path, cv2.COLOR_BGR2GRAY)
 
         # Setup ArUco detector
-        aruco = cv2.aruco
-        aruco_dict = aruco.Dictionary(aruco.DICT_4X4_50,4)  # choose the dict you used to print marker
-        parameters = aruco.DetectorParameters()
+        aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)  # choose the dict you used to print marker
+        parameters = cv2.aruco.DetectorParameters()
+        detector = cv2.aruco.ArucoDetector(aruco_dict,parameters)
 
-        corners_list, ids, rejected = aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
+        corners_list, ids, rejected = detector.detectMarkers(gray)
+
+        #checking if no marker is present
         if corners_list is None or len(corners_list) == 0:
-            raise RuntimeError("No ArUco markers detected")
+            return None
+            # raise RuntimeError("No ArUco markers detected")
+
+        #debugging aruco detection
+        # if ids is not None:
+        #     cv2.aruco.drawDetectedMarkers(self.img_path,corners_list, ids)
+        #     cv2.imshow("markers",self.img_path)
 
         # If multiple markers, pick the one you want. Here we use the first detected marker:
         corners = corners_list[0].reshape((4, 2))  # shape (4,2): four corners in pixel coords
@@ -36,19 +44,20 @@ class seed_measurement:
             side_lengths.append(np.linalg.norm(p1 - p2))
         mean_side_px = float(np.mean(side_lengths))
 
-        # pixel to mm
-        px_to_mm = self.aruco_size_mm / mean_side_px  # mm per pixel
+        # mm per pixel calculation
+        mm_per_pxl = self.aruco_size_mm / mean_side_px  # mm per pixel
 
+        #return a dictionary
         return {
-            "corners_px": corners,      # (4,2)
+            "corners_px": corners,      
             "mean_side_px": mean_side_px,
-            "px_to_mm": px_to_mm,
+            "mm_per_pixel": mm_per_pxl,
             "ids": ids
         }
     
     def calculate_length_width_in_mm(self):
-        pxl_mm_scale = self.__calculate_pixel_to_mm_scale()
-        return pxl_mm_scale
+        mm_per_pxl_scale = self.__calculate_pixel_to_mm_scale()
+        return mm_per_pxl_scale
         
 if __name__ == '__main__':
     cap = cv2.VideoCapture("/dev/video2")
@@ -60,11 +69,12 @@ if __name__ == '__main__':
         obj = seed_measurement(img)
         res = obj.calculate_length_width_in_mm()
         # print(res)
-        print(f"Mean marker side (px): {res['mean_side_px']:.2f}")
-        print(f"Scale: {res['px_to_mm']:.6f} mm / px")
+        if res is not None:
+            print(f"Mean marker side (px): {res['mean_side_px']:.2f}")
+            print(f"Scale: {res['px_to_mm']:.6f} mm / px")
         
         if cv2.waitKey(1) & 0xFF == ord('q'):
-         break
+            break
 
     cap.release()
     cv2.destroyAllWindows()
