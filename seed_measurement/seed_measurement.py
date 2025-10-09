@@ -6,10 +6,10 @@ class seed_measurement:
     def __init__(self,img_path, aruco_size_mm=20.0):
         self.img_path = img_path
         self.aruco_size_mm = aruco_size_mm
-        pass
+        # pass
 
     def __calculate_pixel_to_mm_scale(self):
-        gray = cv2.cvtColor(self.img_path, cv2.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(cv2.imread(self.img_path), cv2.COLOR_RGB2GRAY)
 
         # Setup ArUco detector
         aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)  # choose the dict you used to print marker
@@ -23,10 +23,10 @@ class seed_measurement:
             return None
             # raise RuntimeError("No ArUco markers detected")
 
-        #debugging aruco detection
-        # if ids is not None:
-        #     cv2.aruco.drawDetectedMarkers(self.img_path,corners_list, ids)
-        #     cv2.imshow("markers",self.img_path)
+        # debugging aruco detection
+        if ids is not None:
+            cv2.aruco.drawDetectedMarkers(self.img_path,corners_list, ids)
+            cv2.imshow("markers",self.img_path)
 
         # If multiple markers, pick the one you want. Here we use the first detected marker:
         corners = corners_list[0].reshape((4, 2))  # shape (4,2): four corners in pixel coords
@@ -71,7 +71,7 @@ if __name__ == '__main__':
         # print(res)
         if res is not None:
             print(f"Mean marker side (px): {res['mean_side_px']:.2f}")
-            print(f"Scale: {res['px_to_mm']:.6f} mm / px")
+            print(f"Scale: {res['mm_per_pixel']:.6f} mm / px")
         
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
