@@ -1,8 +1,18 @@
 import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
+from ultralytics import YOLO, SAM
+import numpy as np
 import cv2
 import os
+import sys
+
+# ======== adding path for other modules ========
+module_path = "/home/herve/agsolaire_ml_UNL"
+sys.path.insert(0,module_path)
+
+from read_weight import scale_reader
+from seed_measurement import seed_measurement
 
 class CameraApp(tk.Tk):
     def __init__(self):
@@ -63,6 +73,8 @@ class CameraScreen(tk.Frame):
             imgtk = ImageTk.PhotoImage(image=img)
             self.label.imgtk = imgtk
             self.label.configure(image=imgtk)
+            #debugging
+            # print(f"width: {imgtk.width()} \n Height {imgtk.height()}")
         self.after(10, self.update_frame)
 
     def capture_image(self):
@@ -97,6 +109,11 @@ class ResultScreen(tk.Frame):
         self.status_label = tk.Label(self, text="", font=("Arial", 12))
         self.status_label.pack(pady=10)
 
+        # ======== configuring path for the DL models ========
+        self.yolo_model = YOLO("/home/herve/Downloads/best.pt")
+        self.sam_model = SAM("sam2_b.pt")
+
+
     def tkraise(self, *args, **kwargs):
         """Overridden to refresh image each time screen is shown"""
         super().tkraise(*args, **kwargs)
@@ -117,8 +134,98 @@ class ResultScreen(tk.Frame):
 
     def run_inference(self):
         # Placeholder: integrate your YOLO + SAM2 inference here
-        self.status_label.config(text="Running inference...")
-        self.after(2000, lambda: self.status_label.config(text="Inference complete (placeholder)."))
+        
+
+        image = self.controller.captured_image_path
+        image = cv2.imread(image)
+        
+        image = cv2.resize(image, (640,480))
+
+        # ======== weight measurement ========
+        weight_reading = scale_reader.scale_reader()
+        seed_weight = weight_reading.read_weight()
+
+        # ======== mm per pixel scale calculation ========
+        pixel_to_conversion = seed_measurement.seed_measurement(self.controller.captured_image_path)
+
+        scale_calculation = pixel_to_conversion.calculate_length_width_in_mm()
+
+        if scale_calculation is not None:
+
+            PX_PER_MM = scale_calculation['mm_per_pixel']
+        else:
+            
+            PX_PER_MM = None
+
+
+        # Run YOLO detection
+        results = self.yolo_model.predict(source=image, conf=0.4)
+        boxes = results[0].boxes.xyxy.cpu().numpy()
+        print(f"Number of seeds: {len(boxes)}")
+
+        # Run SAM segmentation using YOLO boxes as prompts
+        sam_results = self.sam_model(image, bboxes=boxes)
+
+        # self.after(2000, lambda: self.status_label.config(text="Inference complete (placeholder)."))
+        overlay = image.copy()
+        seed_id = 0
+
+        for r in sam_results:
+            masks = r.masks.data.cpu().numpy()  # [N, H, W]
+
+            for mask in masks:
+                seed_id += 1
+                mask = (mask > 0.5).astype(np.uint8)  # ensure binary mask
+
+                # Find contour
+                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if not contours:
+                    continue
+
+                cnt = max(contours, key=cv2.contourArea)
+
+                # # ---- Fit ellipse instead of rectangle ----
+                # if len(cnt) < 5:   # cv2.fitEllipse requires >=5 points
+                #     continue
+
+                ellipse = cv2.fitEllipse(cnt)   # (center(x,y), (major_axis, minor_axis), angle)
+                (cx, cy), (MA, ma), angle = ellipse
+
+                # Major = length, Minor = width
+                length_px = max(MA, ma)
+                width_px  = min(MA, ma)
+
+                # Convert to mm if calibration known
+                length_mm = length_px / PX_PER_MM if PX_PER_MM else None
+                width_mm  = width_px  / PX_PER_MM if PX_PER_MM else None
+
+                # ---- Draw ellipse ----
+                cv2.ellipse(overlay, ellipse, (0, 255, 0), 2)  # blue ellipse
+                cv2.circle(overlay, (int(cx), int(cy)), 4, (0, 255, 0), -1)  # green center
+
+                # Put text label
+                if length_mm and width_mm:
+                    label = f"{seed_id}: {length_mm:.2f} x {width_mm:.2f} mm"
+                else:
+                    label = f"{seed_id}: {length_px:.1f} x {width_px:.1f} px"
+
+                # cv2.putText(overlay, label, (int(cx)+10, int(cy)-10),
+                            # cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
+
+        # Blend overlay with original image
+        out = cv2.addWeighted(image, 0.7, overlay, 0.3, 0)
+        inference_image = cv2.cvtColor(out,cv2.COLOR_BGR2RGB)
+        inference_image = Image.fromarray(inference_image)
+
+        # img = Image.open(out).resize((800, 600))
+        imgtk = ImageTk.PhotoImage(inference_image)
+        self.image_label.imgtk = imgtk
+        self.image_label.config(image=imgtk)
+
+        seed_count_string = f"seed count: {len(boxes[0])}"
+        weight_string = f"Weight: {seed_weight}"
+        self.status_label.config(text=seed_count_string )
+        self.status_label.config(text=weight_string)
 
 
 if __name__ == "__main__":
