@@ -9,7 +9,11 @@ class seed_measurement:
         # pass
 
     def __calculate_pixel_to_mm_scale(self):
-        gray = cv2.cvtColor(cv2.imread(self.img_path), cv2.COLOR_RGB2GRAY)
+        # uncomment when running the app
+        # gray = cv2.cvtColor(cv2.imread(self.img_path), cv2.COLOR_BGR2GRAY)
+
+        # uncomment when testing
+        gray = cv2.cvtColor(self.img_path,cv2.COLOR_BGR2GRAY)
 
         # Setup ArUco detector
         aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)  # choose the dict you used to print marker
@@ -24,9 +28,9 @@ class seed_measurement:
             # raise RuntimeError("No ArUco markers detected")
 
         # debugging aruco detection
-        if ids is not None:
-            cv2.aruco.drawDetectedMarkers(self.img_path,corners_list, ids)
-            cv2.imshow("markers",self.img_path)
+        # if ids is not None:
+        #     cv2.aruco.drawDetectedMarkers(self.img_path,corners_list, ids)
+        #     cv2.imshow("markers",self.img_path)
 
         # If multiple markers, pick the one you want. Here we use the first detected marker:
         corners = corners_list[0].reshape((4, 2))  # shape (4,2): four corners in pixel coords
@@ -60,13 +64,18 @@ class seed_measurement:
         return mm_per_pxl_scale
         
 if __name__ == '__main__':
-    cap = cv2.VideoCapture("/dev/video2")
+    cap = cv2.VideoCapture("/dev/video3")
     while True:
         ret,frame = cap.read()
-        img = frame
+        img = "/home/herve/agsolaire_ml_UNL/main_gui/captured_image.png"
+        # img = frame
+
+        print(f"frame type: {frame.shape}")
+        print(f"saved img type: {cv2.imread(img).shape}")
         # img = cv2.imread("image_with_marker.jpg")
-        cv2.imshow("testing",img)
-        obj = seed_measurement(img)
+        # cv2.imshow("testing",cv2.imread(img))
+        obj = seed_measurement(frame)
+        # obj = seed_measurement(cv2.imread(img))
         res = obj.calculate_length_width_in_mm()
         # print(res)
         if res is not None:

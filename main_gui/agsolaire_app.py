@@ -1,8 +1,9 @@
 import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
-from ultralytics import YOLO, SAM
+from ultralytics import YOLO, SAM, FastSAM
 import numpy as np
+import torch
 import cv2
 import os
 import sys
@@ -18,7 +19,7 @@ class CameraApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Seed Segmentation Capture")
-        self.geometry("1000x700")
+        self.geometry("1500x1000")
         self.resizable(False, False)
 
         # shared data between screens
@@ -45,7 +46,7 @@ class CameraScreen(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
-        camera_path = "/dev/video2"
+        camera_path = "/dev/video3"
 
         self.controller = controller
         self.cap = cv2.VideoCapture(camera_path)
@@ -66,8 +67,9 @@ class CameraScreen(tk.Frame):
     def update_frame(self):
         ret, frame = self.cap.read()
         if ret:
-            frame = cv2.flip(frame, 1)
+            # frame = cv2.flip(frame, 1)
             self.current_frame = frame
+            frame = cv2.resize(frame, (800,600))
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             img = Image.fromarray(img)
             imgtk = ImageTk.PhotoImage(image=img)
@@ -79,7 +81,7 @@ class CameraScreen(tk.Frame):
 
     def capture_image(self):
         if hasattr(self, 'current_frame'):
-            filename = "captured_image.jpg"
+            filename = "captured_image.png"
             cv2.imwrite(filename, self.current_frame)
             self.controller.captured_image_path = filename
             self.controller.show_frame(ResultScreen)
@@ -106,11 +108,20 @@ class ResultScreen(tk.Frame):
         infer_btn = ttk.Button(btn_frame, text="Send for Inference", command=self.run_inference)
         infer_btn.grid(row=0, column=1, padx=10)
 
-        self.status_label = tk.Label(self, text="", font=("Arial", 12))
-        self.status_label.pack(pady=10)
+        self.count_label = tk.Label(self, text="", font=("Arial", 12))
+        self.count_label.pack(pady=10)
 
+        self.weight_label = tk.Label(self, text="", font=("Arial", 12))
+        self.weight_label.pack(pady=10)
+
+        self.TKW_label = tk.Label(self, text="", font=("Arial", 12))
+        self.TKW_label.pack(pady=10)
+        
+        self.mm_to_pxl_label = tk.Label(self, text="", font=("Arial", 12))
+        self.mm_to_pxl_label.pack(pady=10)
+        
         # ======== configuring path for the DL models ========
-        self.yolo_model = YOLO("/home/herve/Downloads/best.pt")
+        self.yolo_model = YOLO("/home/herve/segment_better_model/weights/best.pt")
         self.sam_model = SAM("sam2_b.pt")
 
 
@@ -132,21 +143,32 @@ class ResultScreen(tk.Frame):
     def go_back(self):
         self.controller.show_frame(CameraScreen)
 
+        torch.cuda.empty_cache()
+
     def run_inference(self):
-        # Placeholder: integrate your YOLO + SAM2 inference here
         
+        # ======== configuring path for the DL models ========
+        self.yolo_model = YOLO("/home/herve/segment_better_model/weights/best.pt")
+        
+        #when offline try this segmentation model
+        # self.yolo_model = YOLO("/home/herve/agsolaire_ml_UNL/notebooks/runs/segment/agsolaire_yolo_training15/weights/last.pt")
+
+        # self.sam_model = SAM("sam2_b.pt")
+        self.sam_model = SAM("mobile_sam.pt")
+        # self.sam_model = FastSAM("FastSAM-s.pt")
 
         image = self.controller.captured_image_path
         image = cv2.imread(image)
         
-        image = cv2.resize(image, (640,480))
+        image = cv2.resize(image, (800,600))
 
         # ======== weight measurement ========
         weight_reading = scale_reader.scale_reader()
-        seed_weight = weight_reading.read_weight()
+        seed_weight_wt_unit = weight_reading.read_weight()
+        seed_weight = weight_reading.read_weight_as_value()
 
         # ======== mm per pixel scale calculation ========
-        pixel_to_conversion = seed_measurement.seed_measurement(self.controller.captured_image_path)
+        pixel_to_conversion = seed_measurement.seed_measurement(cv2.imread(self.controller.captured_image_path))
 
         scale_calculation = pixel_to_conversion.calculate_length_width_in_mm()
 
@@ -159,12 +181,22 @@ class ResultScreen(tk.Frame):
 
 
         # Run YOLO detection
-        results = self.yolo_model.predict(source=image, conf=0.4)
-        boxes = results[0].boxes.xyxy.cpu().numpy()
-        print(f"Number of seeds: {len(boxes)}")
+        results = self.yolo_model.predict(source=image, conf=0.7)
+        # boxes = results[0].boxes.xyxy.cpu().numpy()
+        boxes = results[0].boxes.xywh.cpu().numpy()
 
+        seed_count = len(boxes)
+
+        # print(f"Number of seeds: {seed_count}")
+        # print(f"mm per pxl: {PX_PER_MM}")
+
+        #Thousand Kernel Calculation
+        TKW = (seed_weight / seed_count) * 1000
+
+        print(boxes.shape) 
         # Run SAM segmentation using YOLO boxes as prompts
-        sam_results = self.sam_model(image, bboxes=boxes)
+        # sam_results = sam_model(image, bboxes=boxes)
+        sam_results = self.sam_model.predict(image, points=boxes[:,:2])
 
         # self.after(2000, lambda: self.status_label.config(text="Inference complete (placeholder)."))
         overlay = image.copy()
@@ -172,6 +204,7 @@ class ResultScreen(tk.Frame):
 
         for r in sam_results:
             masks = r.masks.data.cpu().numpy()  # [N, H, W]
+            # masks = r.masks
 
             for mask in masks:
                 seed_id += 1
@@ -184,9 +217,9 @@ class ResultScreen(tk.Frame):
 
                 cnt = max(contours, key=cv2.contourArea)
 
-                # # ---- Fit ellipse instead of rectangle ----
-                # if len(cnt) < 5:   # cv2.fitEllipse requires >=5 points
-                #     continue
+                # ---- Fit ellipse instead of rectangle ----
+                if len(cnt) < 5:   # cv2.fitEllipse requires >=5 points
+                    continue
 
                 ellipse = cv2.fitEllipse(cnt)   # (center(x,y), (major_axis, minor_axis), angle)
                 (cx, cy), (MA, ma), angle = ellipse
@@ -222,10 +255,20 @@ class ResultScreen(tk.Frame):
         self.image_label.imgtk = imgtk
         self.image_label.config(image=imgtk)
 
-        seed_count_string = f"seed count: {len(boxes[0])}"
-        weight_string = f"Weight: {seed_weight}"
-        self.status_label.config(text=seed_count_string )
-        self.status_label.config(text=weight_string)
+        seed_count_string = f"seed count: {seed_count}"
+        weight_string = f"Weight: {seed_weight_wt_unit}"
+        TKW_string = f"Thousand Kernel Weight: {TKW}"
+        mm_to_pxl_string = f"mm/pxl: {PX_PER_MM}"
+
+        self.count_label.config(text=seed_count_string )
+        self.weight_label.config(text=weight_string)
+        self.TKW_label.config(text=TKW_string)
+        self.mm_to_pxl_label.config(text=mm_to_pxl_string)
+
+        del sam_results
+        del results
+        del self.sam_model
+        del self.yolo_model
 
 
 if __name__ == "__main__":
