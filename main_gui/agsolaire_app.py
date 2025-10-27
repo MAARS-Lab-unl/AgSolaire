@@ -53,9 +53,10 @@ class CameraApp(tk.Tk):
             pass
         
         self.title("AgSolaire App")
-        self.geometry("800x600")
+        # self.geometry("800x600")
         # self.attributes('-fullscreen', True)
-
+        # self.state("zoomed")
+        self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
         # ============ Layout setup ============
         # self.rowconfigure(0, weight=1)
         # self.columnconfigure(0, weight=1)
@@ -110,7 +111,7 @@ class CameraScreen(tk.Frame):
         if ret:
             # frame = cv2.flip(frame, 1)
             self.current_frame = frame
-            frame = cv2.resize(frame, (600,400))
+            frame = cv2.resize(frame, (800,600))
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             img = Image.fromarray(img)
             imgtk = ImageTk.PhotoImage(image=img)
@@ -163,31 +164,41 @@ class ResultScreen(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
+        
+        image_frame = tk.Frame(self)
+        image_frame.pack(side="left", anchor="nw")
 
-        self.image_label = tk.Label(self)
-        self.image_label.pack(pady=20)
+        controls_frame = tk.Frame(self)
+        controls_frame.pack(side="left",  anchor="nw")
 
-        btn_frame = tk.Frame(self)
+        self.image_label = tk.Label(image_frame)
+        self.image_label.pack()
+
+        btn_frame = tk.Frame(controls_frame)
         btn_frame.pack()
 
         back_btn = ttk.Button(btn_frame, text="Back to Camera", command=self.go_back, width = 20)
-        back_btn.grid(row=0, column=0, padx=10)
+        back_btn.pack( pady = 20, padx=20, side ="left")
 
         infer_btn = ttk.Button(btn_frame, text="Send for Inference", command=self.run_inference, width = 20)
-        infer_btn.grid(row=0, column=1, padx=10)
+        infer_btn.pack(pady = 20, padx=20)
 
-        self.count_label = tk.Label(self, text="", font=("Arial", 12))
-        self.count_label.pack(pady=3)
+        results_label = tk.Frame(controls_frame)
+        results_label.pack()
 
-        self.weight_label = tk.Label(self, text="", font=("Arial", 12))
-        self.weight_label.pack(pady=3)
+        self.count_label = tk.Label(results_label, text="", font=("Arial", 12))
+        self.count_label.pack(pady=10)
 
-        self.TKW_label = tk.Label(self, text="", font=("Arial", 12))
-        self.TKW_label.pack(pady=3)
+        self.weight_label = tk.Label(results_label, text="", font=("Arial", 12))
+        self.weight_label.pack(pady=10)
+
+        self.TKW_label = tk.Label(results_label, text="", font=("Arial", 12))
+        self.TKW_label.pack(pady=10)
         
-        self.mm_to_pxl_label = tk.Label(self, text="", font=("Arial", 12))
-        self.mm_to_pxl_label.pack(pady=3)
+        self.mm_to_pxl_label = tk.Label(results_label, text="", font=("Arial", 12))
+        self.mm_to_pxl_label.pack(pady=10)
         
+        self.image_size = (800,600)
         # ======== configuring path for the DL models ========
         # self.yolo_model = YOLO("C:\Users\hmwunguzi2\Documents\AgSolaire-main/model/best.pt")
         # self.sam_model = SAM("sam2_b.pt")
@@ -201,7 +212,7 @@ class ResultScreen(tk.Frame):
     def show_captured_image(self):
         path = self.controller.captured_image_path
         if path and os.path.exists(path):
-            img = Image.open(path).resize((600,400))
+            img = Image.open(path).resize(self.image_size)
             imgtk = ImageTk.PhotoImage(img)
             self.image_label.imgtk = imgtk
             self.image_label.config(image=imgtk)
@@ -210,6 +221,10 @@ class ResultScreen(tk.Frame):
 
     def go_back(self):
         self.controller.show_frame(CameraScreen)
+        self.count_label.config(text="")
+        self.weight_label.config(text="")
+        self.TKW_label.config(text="")
+        self.mm_to_pxl_label.config(text="")
 
         torch.cuda.empty_cache()
 
@@ -326,7 +341,7 @@ class ResultScreen(tk.Frame):
 
         # Blend overlay with original image
         out = cv2.addWeighted(image, 0.7, overlay, 0.3, 0)
-        out = cv2.resize(out, (600,400))
+        out = cv2.resize(out, self.image_size)
         inference_image = cv2.cvtColor(out,cv2.COLOR_BGR2RGB)
         inference_image = Image.fromarray(inference_image)
 
