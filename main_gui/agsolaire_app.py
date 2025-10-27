@@ -189,6 +189,9 @@ class ResultScreen(tk.Frame):
         results_label = tk.Frame(self.controls_frame)
         results_label.pack()
 
+        self.inference_label = tk.Label(results_label, text="", font=("Arial", 12))
+        self.inference_label.pack(pady=10)
+
         self.count_label = tk.Label(results_label, text="", font=("Arial", 12))
         self.count_label.pack(pady=10)
 
@@ -201,8 +204,6 @@ class ResultScreen(tk.Frame):
         self.mm_to_pxl_label = tk.Label(results_label, text="", font=("Arial", 12))
         self.mm_to_pxl_label.pack(pady=10)
 
-        self.prog_bar = ttk.Progressbar(self.controls_frame, mode="indeterminate", length=100)
-        self.prog_bar.pack(pady=20)
         
         self.image_size = (800,600)
         # ======== configuring path for the DL models ========
@@ -227,11 +228,13 @@ class ResultScreen(tk.Frame):
 
     def go_back(self):
         self.controller.show_frame(CameraScreen)
+
         self.count_label.config(text="")
         self.weight_label.config(text="")
         self.TKW_label.config(text="")
         self.mm_to_pxl_label.config(text="")
-        self.prog_bar.pack_forget()
+
+        self.inference_label.config(text="")
 
         torch.cuda.empty_cache()
 
@@ -247,7 +250,7 @@ class ResultScreen(tk.Frame):
             self.sam_model = SAM(os.path.join(base_path, "model", "mobile_sam.pt"))
 
         # Start progress bar
-        self.prog_bar.start()
+        self.inference_label.config(text="Running inference ......")
 
         image = self.controller.captured_image_path
         image = cv2.imread(image)
@@ -317,7 +320,7 @@ class ResultScreen(tk.Frame):
 
         # ======== Create Timestamped Run Folder ========
         run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        run_folder = os.path.join(os.getcwd(), f"Run_{run_timestamp}")
+        run_folder = os.path.join(os.getcwd(), f"Results/Run_{run_timestamp}")
         os.makedirs(run_folder, exist_ok=True)
         print(f"[INFO] Run folder created: {run_folder}")
 
@@ -358,8 +361,7 @@ class ResultScreen(tk.Frame):
         inference_image = Image.fromarray(inference_image)
         
         #stop the progress bar
-        self.prog_bar.stop()
-        self.prog_bar.pack_forget()
+        self.inference_label.config(text="Refence Completed !!!")
 
         # img = Image.open(out).resize((800, 600))
         imgtk = ImageTk.PhotoImage(inference_image)
