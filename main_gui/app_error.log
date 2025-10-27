@@ -1,0 +1,14 @@
+ERROR:root:Traceback (most recent call last):
+  File "C:\Users\hmwunguzi2\Documents\AgSolaire-main\main_gui\agsolaire_app.py", line 343, in <module>
+    app.mainloop()
+  File "C:\Python310\lib\tkinter\__init__.py", line 1458, in mainloop
+    self.tk.mainloop(n)
+KeyboardInterrupt
+
+ERROR:root:Traceback (most recent call last):
+  File "C:\Users\hmwunguzi2\Documents\AgSolaire-main\main_gui\agsolaire_app.py", line 353, in <module>
+    app.mainloop()
+  File "C:\Python310\lib\tkinter\__init__.py", line 1458, in mainloop
+    self.tk.mainloop(n)
+KeyboardInterrupt
+
