@@ -55,8 +55,8 @@ class CameraApp(tk.Tk):
         self.title("AgSolaire App")
         # self.geometry("800x600")
         # self.attributes('-fullscreen', True)
-        # self.state("zoomed")
-        self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
+        self.state("zoomed")
+        # self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
         # ============ Layout setup ============
         # self.rowconfigure(0, weight=1)
         # self.columnconfigure(0, weight=1)
@@ -168,13 +168,13 @@ class ResultScreen(tk.Frame):
         image_frame = tk.Frame(self)
         image_frame.pack(side="left", anchor="nw")
 
-        controls_frame = tk.Frame(self)
-        controls_frame.pack(side="left",  anchor="nw")
+        self.controls_frame = tk.Frame(self)
+        self.controls_frame.pack(side="left",  anchor="nw")
 
         self.image_label = tk.Label(image_frame)
         self.image_label.pack()
 
-        btn_frame = tk.Frame(controls_frame)
+        btn_frame = tk.Frame(self.controls_frame)
         btn_frame.pack()
 
         back_btn = ttk.Button(btn_frame, text="Back to Camera", command=self.go_back, width = 20)
@@ -183,7 +183,7 @@ class ResultScreen(tk.Frame):
         infer_btn = ttk.Button(btn_frame, text="Send for Inference", command=self.run_inference, width = 20)
         infer_btn.pack(pady = 20, padx=20)
 
-        results_label = tk.Frame(controls_frame)
+        results_label = tk.Frame(self.controls_frame)
         results_label.pack()
 
         self.count_label = tk.Label(results_label, text="", font=("Arial", 12))
@@ -225,6 +225,7 @@ class ResultScreen(tk.Frame):
         self.weight_label.config(text="")
         self.TKW_label.config(text="")
         self.mm_to_pxl_label.config(text="")
+        self.prog_bar.pack_forget()
 
         torch.cuda.empty_cache()
 
@@ -250,6 +251,11 @@ class ResultScreen(tk.Frame):
         # self.sam_model = SAM("sam2_b.pt")
         # self.sam_model = SAM("mobile_sam.pt")
         # self.sam_model = FastSAM("FastSAM-s.pt")
+
+        #create a progress bar and start it
+        self.prog_bar = ttk.Progressbar(self.controls_frame, mode="indeterminate", length=100)
+        self.prog_bar.pack(pady=20)
+        self.prog_bar.start()
 
         image = self.controller.captured_image_path
         image = cv2.imread(image)
@@ -344,6 +350,10 @@ class ResultScreen(tk.Frame):
         out = cv2.resize(out, self.image_size)
         inference_image = cv2.cvtColor(out,cv2.COLOR_BGR2RGB)
         inference_image = Image.fromarray(inference_image)
+        
+        #stop the progress bar
+        self.prog_bar.stop()
+        self.prog_bar.pack_forget()
 
         # img = Image.open(out).resize((800, 600))
         imgtk = ImageTk.PhotoImage(inference_image)
