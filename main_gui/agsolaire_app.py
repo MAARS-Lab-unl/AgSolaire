@@ -11,6 +11,7 @@ import os
 import sys
 import usb.core
 import threading
+import copy
 from datetime import datetime
 
 import traceback, logging
@@ -120,7 +121,7 @@ class CameraScreen(tk.Frame):
 
         camera_index = 0
         if self.find_camera_index() != None:
-            camera_index = self.find_camera_index()[0]
+            camera_index = self.find_camera_index()[1]
 
         self.controller = controller
         self.cap = cv2.VideoCapture(camera_index)
@@ -145,7 +146,7 @@ class CameraScreen(tk.Frame):
     def update_frame(self):
         ret, frame = self.cap.read()
         if ret:
-            # frame = cv2.flip(frame, 1)
+            
             self.current_frame = frame
             frame = cv2.resize(frame, (800,600))
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -153,13 +154,12 @@ class CameraScreen(tk.Frame):
             imgtk = ImageTk.PhotoImage(image=img)
             self.label.imgtk = imgtk
             self.label.configure(image=imgtk)
-            #debugging
-            # print(f"width: {imgtk.width()} \n Height {imgtk.height()}")
+  
         self.after(10, self.update_frame)
 
     def capture_image(self):
         if hasattr(self, 'current_frame'):
-            filename = "captured_image.png"
+            filename = "captured_image.jpg"
             cv2.imwrite(filename, self.current_frame)
             self.controller.captured_image_path = filename
             self.controller.show_frame(ResultScreen)
@@ -230,7 +230,8 @@ class ResultScreen(tk.Frame):
         self.spinner = Spinner(self.controls_frame, size=60, color="#4CAF50", speed=20)
 
         self.inference_label = tk.Label(results_label, text="", font=("Arial", 12))
-
+        self.inference_label.pack(pady=10)
+        
         self.count_label = tk.Label(results_label, text="", font=("Arial", 12))
         self.count_label.pack(pady=10)
 
@@ -242,7 +243,6 @@ class ResultScreen(tk.Frame):
         
         self.mm_to_pxl_label = tk.Label(results_label, text="", font=("Arial", 12))
         self.mm_to_pxl_label.pack(pady=10)
-
         
         self.image_size = (800,600)
 
@@ -329,6 +329,7 @@ class ResultScreen(tk.Frame):
         sam_results = self.sam_model.predict(image, points=boxes[:, :2])
 
         overlay = image.copy()
+        overlay_with_seed_id = image.copy()
         seed_id = 0
         seed_data = []
 
@@ -363,17 +364,32 @@ class ResultScreen(tk.Frame):
                 cv2.ellipse(overlay, ellipse, (0, 255,0), 4)
                 cv2.circle(overlay, (int(cx), int(cy)), 4, (0, 255, 0), -1)
 
+                cv2.putText(overlay_with_seed_id, f"{seed_id}", (int(cx)+2, int(cy)-10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
+
                 seed_data.append({
                     "Seed_ID": seed_id,
                     "Length_mm": round(length_mm, 3) if length_mm else None,
                     "Width_mm": round(width_mm, 3) if width_mm else None
                 })
 
+        #creating image masked with results
+        out = cv2.addWeighted(image, 0.5, overlay, 0.5, 0)
+        out_with_seed_id = cv2.addWeighted(out, 0.7, overlay_with_seed_id, 0.3, 0.3)
+        out = cv2.resize(out, self.image_size)
+        out_with_seed_id = cv2.resize(out_with_seed_id, self.image_size)
+
         # ======== Create Timestamped Run Folder ========
         run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         run_folder = os.path.join(os.getcwd(), f"Results/Run_{run_timestamp}")
         os.makedirs(run_folder, exist_ok=True)
         print(f"[INFO] Run folder created: {run_folder}")
+
+        #Adding images to the results
+        original_image_filename = os.path.join(run_folder, f"original_image.jpg")
+        masked_image_filename = os.path.join(run_folder, f"masked_image.jpg")
+        cv2.imwrite(original_image_filename, cv2.resize(image, self.image_size))
+        cv2.imwrite(masked_image_filename, out_with_seed_id)
 
         # Save Seed Measurements CSV
         seed_csv_filename = os.path.join(run_folder, f"seed_measurements_{run_timestamp}.csv")
@@ -406,8 +422,6 @@ class ResultScreen(tk.Frame):
         print(f"[INFO] Results saved to {result_csv_filename}")
 
         # Display Overlay on GUI
-        out = cv2.addWeighted(image, 0.7, overlay, 0.3, 0)
-        out = cv2.resize(out, self.image_size)
         inference_image = cv2.cvtColor(out,cv2.COLOR_BGR2RGB)
         inference_image = Image.fromarray(inference_image)
 
