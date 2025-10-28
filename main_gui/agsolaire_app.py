@@ -46,6 +46,35 @@ def log_exception(exc_type, exc_value, exc_traceback):
 
 sys.excepthook = log_exception
 
+#Spinning Progress bar class
+class Spinner(tk.Canvas):
+    def __init__(self, parent, size=60, line_width=6, speed=10, color="#4CAF50"):
+        super().__init__(parent, width=size, height=size, bg="white", highlightthickness=0)
+        self.size = size
+        self.line_width = line_width
+        self.speed = speed
+        self.color = color
+        self.angle = 0
+        self.running = False
+        self.arc = self.create_arc(5, 5, size-5, size-5, start=self.angle,
+                                   extent=90, style="arc", width=line_width, outline=color)
+
+    def start(self):
+        self.running = True
+        self._rotate()
+
+    def stop(self):
+        self.running = False
+
+    def _rotate(self):
+        if not self.running:
+            return
+        self.angle = (self.angle - self.speed) % 360
+        self.itemconfig(self.arc, start=self.angle)
+        self.after(50, self._rotate)
+
+
+
 class CameraApp(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -198,8 +227,9 @@ class ResultScreen(tk.Frame):
         results_label = tk.Frame(self.controls_frame)
         results_label.pack()
 
+        self.spinner = Spinner(self.controls_frame, size=60, color="#4CAF50", speed=20)
+
         self.inference_label = tk.Label(results_label, text="", font=("Arial", 12))
-        self.inference_label.pack(pady=10)
 
         self.count_label = tk.Label(results_label, text="", font=("Arial", 12))
         self.count_label.pack(pady=10)
@@ -215,6 +245,8 @@ class ResultScreen(tk.Frame):
 
         
         self.image_size = (800,600)
+
+  
 
 
     def tkraise(self, *args, **kwargs):
@@ -242,7 +274,7 @@ class ResultScreen(tk.Frame):
 
         self.inference_label.config(text="")
 
-        self.prog_bar.pack_forget()
+        self.spinner.pack_forget()
 
         torch.cuda.empty_cache()
 
@@ -252,9 +284,8 @@ class ResultScreen(tk.Frame):
         self.inference_label.config(text="Model Inference running ... !!!!!")
 
         #create a progress bar and start it
-        self.prog_bar = ttk.Progressbar(self.controls_frame, mode="indeterminate", length=100)
-        self.prog_bar.pack(pady=20)
-        self.prog_bar.start()
+        self.spinner.pack(pady=10)
+        self.spinner.start()
 
         #start a thread for running inference
         threading.Thread(target=self.run_inference,daemon=True).start()
@@ -380,11 +411,11 @@ class ResultScreen(tk.Frame):
         inference_image = cv2.cvtColor(out,cv2.COLOR_BGR2RGB)
         inference_image = Image.fromarray(inference_image)
 
-        #progressbar 
-        self.prog_bar.pack_forget()
+        # remove progressbar 
+        self.spinner.pack_forget()
         
         #Update label
-        self.inference_label.config(text="Refence Completed !!!")
+        self.inference_label.config(text="Inference Completed !!!")
 
         # img = Image.open(out).resize((800, 600))
         imgtk = ImageTk.PhotoImage(inference_image)
