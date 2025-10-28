@@ -10,6 +10,7 @@ import csv
 import os
 import sys
 import usb.core
+import threading
 from datetime import datetime
 
 import traceback, logging
@@ -90,7 +91,7 @@ class CameraScreen(tk.Frame):
 
         camera_index = 0
         if self.find_camera_index() != None:
-            camera_index = self.find_camera_index()[1]
+            camera_index = self.find_camera_index()[0]
 
         self.controller = controller
         self.cap = cv2.VideoCapture(camera_index)
@@ -191,7 +192,7 @@ class ResultScreen(tk.Frame):
         back_btn = ttk.Button(btn_frame, text="Back to Camera", command=self.go_back, style='My.TButton')
         back_btn.pack( pady = 20, padx=20, side ="left")
 
-        infer_btn = ttk.Button(btn_frame, text="Send for Inference", command=self.run_inference, style='My.TButton')
+        infer_btn = ttk.Button(btn_frame, text="Send for Inference", command=self.run_inference_button_click, style='My.TButton')
         infer_btn.pack(pady = 20, padx=10)
 
         results_label = tk.Frame(self.controls_frame)
@@ -241,7 +242,23 @@ class ResultScreen(tk.Frame):
 
         self.inference_label.config(text="")
 
+        self.prog_bar.pack_forget()
+
         torch.cuda.empty_cache()
+
+    def run_inference_button_click(self):
+
+        #label
+        self.inference_label.config(text="Model Inference running ... !!!!!")
+
+        #create a progress bar and start it
+        self.prog_bar = ttk.Progressbar(self.controls_frame, mode="indeterminate", length=100)
+        self.prog_bar.pack(pady=20)
+        self.prog_bar.start()
+
+        #start a thread for running inference
+        threading.Thread(target=self.run_inference,daemon=True).start()
+
 
     def run_inference(self):
 
@@ -362,8 +379,11 @@ class ResultScreen(tk.Frame):
         out = cv2.resize(out, self.image_size)
         inference_image = cv2.cvtColor(out,cv2.COLOR_BGR2RGB)
         inference_image = Image.fromarray(inference_image)
+
+        #progressbar 
+        self.prog_bar.pack_forget()
         
-        #stop the progress bar
+        #Update label
         self.inference_label.config(text="Refence Completed !!!")
 
         # img = Image.open(out).resize((800, 600))

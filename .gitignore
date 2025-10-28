@@ -1,4 +1,5 @@
 build/
 dist/
-agsolaire_app.spec
-
+Results/
+# agsolaire_app.spec
+app_error.log
