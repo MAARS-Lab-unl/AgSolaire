@@ -58,8 +58,8 @@ class CameraApp(tk.Tk):
         self.title("AgSolaire App")
         # self.geometry("800x600")
         # self.attributes('-fullscreen', True)
-        # self.state("zoomed")
-        self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
+        self.state("zoomed")
+       
         # ============ Layout setup ============
         # self.rowconfigure(0, weight=1)
         # self.columnconfigure(0, weight=1)
@@ -88,7 +88,6 @@ class CameraScreen(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
-        # camera_path = "/dev/video3"
         camera_index = 0
         if self.find_camera_index() != None:
             camera_index = self.find_camera_index()[1]
@@ -101,10 +100,14 @@ class CameraScreen(tk.Frame):
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=10)
 
-        capture_btn = ttk.Button(btn_frame, text="Capture Image", command=self.capture_image, width=20)
+        ttk.Style().configure('My.TButton', 
+        font=('Helvetica', 15),  # Increase font size
+        padding=(10, 5)) 
+
+        capture_btn = ttk.Button(btn_frame, text="Capture Image", command=self.capture_image,style='My.TButton')
         capture_btn.grid(row=0, column=0, padx=5)
 
-        quit_btn = ttk.Button(btn_frame, text="Quit", command=self.quit_app, width = 20)
+        quit_btn = ttk.Button(btn_frame, text="Quit", command=self.quit_app, style='My.TButton')
         quit_btn.grid(row=0, column=1, padx=5)
 
         self.update_frame()
@@ -169,7 +172,7 @@ class ResultScreen(tk.Frame):
         self.controller = controller
         
         image_frame = tk.Frame(self)
-        image_frame.pack(side="left", anchor="nw")
+        image_frame.pack(side="left", anchor="nw", pady=20, padx=20)
 
         self.controls_frame = tk.Frame(self)
         self.controls_frame.pack(side="left",  anchor="nw")
@@ -180,11 +183,16 @@ class ResultScreen(tk.Frame):
         btn_frame = tk.Frame(self.controls_frame)
         btn_frame.pack()
 
-        back_btn = ttk.Button(btn_frame, text="Back to Camera", command=self.go_back, width = 20)
+
+        ttk.Style().configure('My.TButton', 
+        font=('Helvetica', 10),  # Increase font size
+        padding=(10, 5))  
+        
+        back_btn = ttk.Button(btn_frame, text="Back to Camera", command=self.go_back, style='My.TButton')
         back_btn.pack( pady = 20, padx=20, side ="left")
 
-        infer_btn = ttk.Button(btn_frame, text="Send for Inference", command=self.run_inference, width = 20)
-        infer_btn.pack(pady = 20, padx=20)
+        infer_btn = ttk.Button(btn_frame, text="Send for Inference", command=self.run_inference, style='My.TButton')
+        infer_btn.pack(pady = 20, padx=10)
 
         results_label = tk.Frame(self.controls_frame)
         results_label.pack()
@@ -206,9 +214,6 @@ class ResultScreen(tk.Frame):
 
         
         self.image_size = (800,600)
-        # ======== configuring path for the DL models ========
-        # self.yolo_model = YOLO("C:\Users\hmwunguzi2\Documents\AgSolaire-main/model/best.pt")
-        # self.sam_model = SAM("sam2_b.pt")
 
 
     def tkraise(self, *args, **kwargs):
@@ -249,8 +254,6 @@ class ResultScreen(tk.Frame):
             self.yolo_model = YOLO(os.path.join(base_path, "model", "yolo_detection_model.pt"))
             self.sam_model = SAM(os.path.join(base_path, "model", "mobile_sam.pt"))
 
-        # Start progress bar
-        self.inference_label.config(text="Running inference ......")
 
         image = self.controller.captured_image_path
         image = cv2.imread(image)
@@ -267,7 +270,7 @@ class ResultScreen(tk.Frame):
         PX_PER_MM = scale_calculation['mm_per_pixel'] if scale_calculation else None
 
         # YOLO Detection
-        results = self.yolo_model.predict(source=image, conf=0.5)
+        results = self.yolo_model.predict(source=image, conf=0.6)
         boxes = results[0].boxes.xywh.cpu().numpy()
         seed_count = len(boxes)
 
@@ -309,7 +312,7 @@ class ResultScreen(tk.Frame):
                 length_mm = length_px / PX_PER_MM if PX_PER_MM else None
                 width_mm  = width_px  / PX_PER_MM if PX_PER_MM else None
 
-                cv2.ellipse(overlay, ellipse, (0, 255, 0), 2)
+                cv2.ellipse(overlay, ellipse, (0, 255,0), 4)
                 cv2.circle(overlay, (int(cx), int(cy)), 4, (0, 255, 0), -1)
 
                 seed_data.append({
