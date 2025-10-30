@@ -21,10 +21,12 @@ class scale_reader:
 
         self._serial = None
 
-        if port == None:
-            port = self.find_device("Dtech USB Serial Controller")
-            print(port)
-        
+        # port_name = "Dtech USB Serial Controller"
+        port_name = "Prolific PL2303GT USB Serial"
+            
+        port = self.find_device(port_name)
+
+         
         #initializing the serial object
         try:
             self._serial = serial.Serial(port,baudrate,timeout=1)
