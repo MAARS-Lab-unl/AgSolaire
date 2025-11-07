@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk,font
+from tkinter import ttk,font,simpledialog
 from ctypes import windll
 from PIL import Image, ImageTk
 from ultralytics import YOLO, SAM, FastSAM
@@ -243,6 +243,11 @@ class ResultScreen(tk.Frame):
         
         self.mm_to_pxl_label = tk.Label(results_label, text="", font=("Arial", 12))
         self.mm_to_pxl_label.pack(pady=10)
+
+        self.save_results_btn = ttk.Button(self.controls_frame, text="Save Results", command=self.save_results, style='My.TButton')
+
+        self.saving_label = tk.Label(self.controls_frame, text="", font=("Arial", 12))
+        self.saving_label.pack(pady=20)
         
         self.image_size = (800,600)
 
@@ -271,10 +276,12 @@ class ResultScreen(tk.Frame):
         self.weight_label.config(text="")
         self.TKW_label.config(text="")
         self.mm_to_pxl_label.config(text="")
+        self.saving_label.config(text="")
 
         self.inference_label.config(text="")
 
         self.spinner.pack_forget()
+        self.save_results_btn.pack_forget()
 
         torch.cuda.empty_cache()
 
@@ -309,8 +316,8 @@ class ResultScreen(tk.Frame):
 
         # Weight Measurement
         weight_reading = scale_reader.scale_reader()
-        seed_weight_wt_unit = weight_reading.read_weight()
-        seed_weight = weight_reading.read_weight_as_value()
+        seed_weight_wt_unit = weight_reading.read_weight() 
+        seed_weight = weight_reading.read_weight_as_value() if weight_reading.read_weight_as_value() != None else 0
 
         # mm per pixel scale calculation
         pixel_to_conversion = seed_measurement(cv2.imread(self.controller.captured_image_path))
@@ -318,7 +325,7 @@ class ResultScreen(tk.Frame):
         PX_PER_MM = scale_calculation['mm_per_pixel'] if scale_calculation else None
 
         # YOLO Detection
-        results = self.yolo_model.predict(source=image, conf=0.6)
+        results = self.yolo_model.predict(source=image, conf=0.8)
         boxes = results[0].boxes.xywh.cpu().numpy()
         seed_count = len(boxes)
 
@@ -446,6 +453,8 @@ class ResultScreen(tk.Frame):
         self.TKW_label.config(text=TKW_string)
         self.mm_to_pxl_label.config(text=mm_to_pxl_string)
 
+        self.save_results_btn.pack( pady = 20, padx=20, side ="left")
+
         # Cleanup
         del sam_results
         del results
@@ -453,6 +462,12 @@ class ResultScreen(tk.Frame):
         del self.yolo_model
 
         print("[INFO] Inference completed successfully.")
+    
+    def save_results(self):
+        self.sample_ID = simpledialog.askstring("Barcode Entry", "Sample ID:")
+
+        self.save_results_btn.pack_forget()
+        self.saving_label.config(text="Results saved !!!!")
 
 
 if __name__ == "__main__":

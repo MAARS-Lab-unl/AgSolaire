@@ -54,6 +54,11 @@ class scale_reader:
             print(f"Error happend while initializing serial communication.")
         else:
             #return the weight including the units
+            try:
+                self._serial.readline().decode('utf-8').strip()
+            except Exception as e:
+                return None
+            
             return self._serial.readline().decode('utf-8').strip()
     
     #read only the value from the scale 
@@ -62,6 +67,11 @@ class scale_reader:
             print(f"Error happend while initializing serial communication.")
         else:
             #return the weight with no unit and as a float
+            try:
+                float(self._serial.readline().decode('utf-8').rstrip('gctgnoz\r\n'))
+            except Exception as e:
+                return None
+
             return float(self._serial.readline().decode('utf-8').rstrip('gctgnoz\r\n'))
         
     #autodetect the scale COM port:
