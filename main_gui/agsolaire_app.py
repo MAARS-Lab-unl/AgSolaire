@@ -47,6 +47,29 @@ def log_exception(exc_type, exc_value, exc_traceback):
 
 sys.excepthook = log_exception
 
+# creating folder and file for saving results
+
+# ======== Create Timestamped Run Folder ========
+run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+run_folder = os.path.join(os.getcwd(), f"Results\Run_{run_timestamp}")
+os.makedirs(run_folder, exist_ok=True)
+print(f"[INFO] Run folder created: {run_folder}")
+
+# ======== Create file for saving results ========
+result_csv_filename = os.path.join(run_folder, f"result_{run_timestamp}.csv")
+with open(result_csv_filename, mode='w', newline='') as result_file:
+    fieldnames = ["Sample ID","Average_Length_mm", "Average_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight"]
+    writer = csv.DictWriter(result_file, fieldnames=fieldnames)
+    writer.writeheader()
+print(f"[INFO] Results saved to {result_csv_filename}")
+
+# ======== Create file for information for individual seed information ========
+# seed_csv_filename = os.path.join(run_folder, f"seed_measurements_{run_timestamp}.csv")
+# with open(seed_csv_filename, mode='w', newline='') as file:
+#     writer = csv.DictWriter(file, fieldnames=["Seed_ID", "Length_mm", "Width_mm"])
+#     writer.writeheader()
+# print(f"[INFO] Seed metrics saved to {seed_csv_filename}")
+
 #Spinning Progress bar class
 class Spinner(tk.Canvas):
     def __init__(self, parent, size=60, line_width=6, speed=10, color="#4CAF50"):
@@ -201,6 +224,7 @@ class ResultScreen(tk.Frame):
         super().__init__(parent)
         self.controller = controller
         
+        # GUI component initialization
         image_frame = tk.Frame(self)
         image_frame.pack(side="left", anchor="nw", pady=20, padx=20)
 
@@ -250,8 +274,6 @@ class ResultScreen(tk.Frame):
         self.saving_label.pack(pady=20)
         
         self.image_size = (800,600)
-
-  
 
 
     def tkraise(self, *args, **kwargs):
@@ -310,14 +332,14 @@ class ResultScreen(tk.Frame):
             self.sam_model = SAM(os.path.join(base_path, "model", "mobile_sam.pt"))
 
 
-        image = self.controller.captured_image_path
-        image = cv2.imread(image)
-        image = cv2.resize(image, (1024, 1024))
+        self.image = self.controller.captured_image_path
+        self.image = cv2.imread(self.image)
+        self.image = cv2.resize(self.image, (1024, 1024))
 
         # Weight Measurement
         weight_reading = scale_reader.scale_reader()
-        seed_weight_wt_unit = weight_reading.read_weight() 
-        seed_weight = weight_reading.read_weight_as_value() if weight_reading.read_weight_as_value() != None else 0
+        self.seed_weight_wt_unit = weight_reading.read_weight() 
+        self.seed_weight = weight_reading.read_weight_as_value() if weight_reading.read_weight_as_value() != None else 0
 
         # mm per pixel scale calculation
         pixel_to_conversion = seed_measurement(cv2.imread(self.controller.captured_image_path))
@@ -325,18 +347,18 @@ class ResultScreen(tk.Frame):
         PX_PER_MM = scale_calculation['mm_per_pixel'] if scale_calculation else None
 
         # YOLO Detection
-        results = self.yolo_model.predict(source=image, conf=0.8)
+        results = self.yolo_model.predict(source=self.image, conf=0.7)
         boxes = results[0].boxes.xywh.cpu().numpy()
-        seed_count = len(boxes)
+        self.seed_count = len(boxes)
 
         # Thousand Kernel Weight
-        TKW = (seed_weight / seed_count) * 1000 if seed_count > 0 else 0
+        self.TKW = (self.seed_weight / self.seed_count) * 1000 if self.seed_count > 0 else 0
 
         # SAM Segmentation
-        sam_results = self.sam_model.predict(image, points=boxes[:, :2])
+        sam_results = self.sam_model.predict(self.image, points=boxes[:, :2])
 
-        overlay = image.copy()
-        overlay_with_seed_id = image.copy()
+        overlay = self.image.copy()
+        overlay_with_seed_id = self.image.copy()
         seed_id = 0
         seed_data = []
 
@@ -371,62 +393,28 @@ class ResultScreen(tk.Frame):
                 cv2.ellipse(overlay, ellipse, (0, 255,0), 4)
                 cv2.circle(overlay, (int(cx), int(cy)), 4, (0, 255, 0), -1)
 
-                cv2.putText(overlay_with_seed_id, f"{seed_id}", (int(cx)+2, int(cy)-10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
-
                 seed_data.append({
                     "Seed_ID": seed_id,
                     "Length_mm": round(length_mm, 3) if length_mm else None,
                     "Width_mm": round(width_mm, 3) if width_mm else None
                 })
+                seed_label = f"id:{seed_id}"
+                cv2.putText(overlay_with_seed_id, f"{seed_label}", (int(cx)+2, int(cy)-10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
 
         #creating image masked with results
-        out = cv2.addWeighted(image, 0.5, overlay, 0.5, 0)
-        out_with_seed_id = cv2.addWeighted(out, 0.7, overlay_with_seed_id, 0.3, 0.3)
+        out = cv2.addWeighted(self.image, 0.5, overlay, 0.5, 0)
+        self.out_with_seed_id = cv2.addWeighted(out, 0.7, overlay_with_seed_id, 0.3, 0.3)
         out = cv2.resize(out, self.image_size)
-        out_with_seed_id = cv2.resize(out_with_seed_id, self.image_size)
-
-        # ======== Create Timestamped Run Folder ========
-        run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        run_folder = os.path.join(os.getcwd(), f"Results/Run_{run_timestamp}")
-        os.makedirs(run_folder, exist_ok=True)
-        print(f"[INFO] Run folder created: {run_folder}")
-
-        #Adding images to the results
-        original_image_filename = os.path.join(run_folder, f"original_image.jpg")
-        masked_image_filename = os.path.join(run_folder, f"masked_image.jpg")
-        cv2.imwrite(original_image_filename, cv2.resize(image, self.image_size))
-        cv2.imwrite(masked_image_filename, out_with_seed_id)
-
-        # Save Seed Measurements CSV
-        seed_csv_filename = os.path.join(run_folder, f"seed_measurements_{run_timestamp}.csv")
-        with open(seed_csv_filename, mode='w', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=["Seed_ID", "Length_mm", "Width_mm"])
-            writer.writeheader()
-            writer.writerows(seed_data)
-        print(f"[INFO] Seed metrics saved to {seed_csv_filename}")
+        self.out_with_seed_id = cv2.resize(self.out_with_seed_id, self.image_size)
 
         # Compute Summary Statistics
         valid_lengths = [s["Length_mm"] for s in seed_data if s["Length_mm"]]
         valid_widths = [s["Width_mm"] for s in seed_data if s["Width_mm"]]
 
-        avg_length = round(sum(valid_lengths) / len(valid_lengths), 3) if valid_lengths else 0
-        avg_width = round(sum(valid_widths) / len(valid_widths), 3) if valid_widths else 0
+        self.avg_length = round(sum(valid_lengths) / len(valid_lengths), 3) if valid_lengths else 0.0
+        self.avg_width = round(sum(valid_widths) / len(valid_widths), 3) if valid_widths else 0.0
 
-        # Save Result CSV
-        result_csv_filename = os.path.join(run_folder, f"result_{run_timestamp}.csv")
-        with open(result_csv_filename, mode='w', newline='') as result_file:
-            fieldnames = ["Average_Length_mm", "Average_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight"]
-            writer = csv.DictWriter(result_file, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerow({
-                "Average_Length_mm": avg_length,
-                "Average_Width_mm": avg_width,
-                "Total_Seeds": seed_count,
-                "Total_Weight": seed_weight_wt_unit,
-                "Thousand_Kernel_Weight": round(TKW, 3)
-            })
-        print(f"[INFO] Results saved to {result_csv_filename}")
 
         # Display Overlay on GUI
         inference_image = cv2.cvtColor(out,cv2.COLOR_BGR2RGB)
@@ -443,9 +431,9 @@ class ResultScreen(tk.Frame):
         self.image_label.imgtk = imgtk
         self.image_label.config(image=imgtk)
 
-        seed_count_string = f"seed count: {seed_count}"
-        weight_string = f"Weight: {seed_weight_wt_unit}"
-        TKW_string = f"Thousand Kernel Weight: {TKW}"
+        seed_count_string = f"seed count: {self.seed_count}"
+        weight_string = f"Weight: {self.seed_weight_wt_unit}"
+        TKW_string = f"Thousand Kernel Weight: {self.TKW}"
         mm_to_pxl_string = f"mm/pxl: {PX_PER_MM}"
 
         self.count_label.config(text=seed_count_string )
@@ -465,6 +453,26 @@ class ResultScreen(tk.Frame):
     
     def save_results(self):
         self.sample_ID = simpledialog.askstring("Barcode Entry", "Sample ID:")
+
+        # Save Result CSV
+        with open(result_csv_filename, mode='a', newline='') as result_file:
+            fieldnames = ["Sample ID","Average_Length_mm", "Average_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight"]
+            writer = csv.DictWriter(result_file, fieldnames=fieldnames)
+            writer.writerow({
+                "Sample ID":self.sample_ID,
+                "Average_Length_mm": self.avg_length,
+                "Average_Width_mm": self.avg_width,
+                "Total_Seeds": self.seed_count,
+                "Total_Weight": self.seed_weight_wt_unit,
+                "Thousand_Kernel_Weight": round(self.TKW, 3)
+            })
+        print(f"[INFO] Results saved to {result_csv_filename}")
+
+        #Adding images to the results
+        # original_image_filename = os.path.join(run_folder, f"original_image_sample_{self.sample_ID}.jpg")
+        masked_image_filename = os.path.join(run_folder, f"masked_image_sample_{self.sample_ID}.jpg")
+        # cv2.imwrite(original_image_filename, cv2.resize(self.image, self.image_size))
+        cv2.imwrite(masked_image_filename, self.out_with_seed_id)
 
         self.save_results_btn.pack_forget()
         self.saving_label.config(text="Results saved !!!!")
