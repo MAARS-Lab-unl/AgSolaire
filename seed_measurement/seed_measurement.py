@@ -64,10 +64,10 @@ class seed_measurement:
         return mm_per_pxl_scale
         
 if __name__ == '__main__':
-    cap = cv2.VideoCapture("/dev/video3")
+    cap = cv2.VideoCapture(0)
     while True:
         ret,frame = cap.read()
-        img = "/home/herve/agsolaire_ml_UNL/main_gui/captured_image.png"
+        img = r"C:\Users\hmwunguzi2\Documents\AgSolaire-main\captured_image.jpg"
         # img = frame
 
         print(f"frame type: {frame.shape}")

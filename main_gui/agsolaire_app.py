@@ -17,7 +17,8 @@ from datetime import datetime
 import traceback, logging
 
 # ======== adding path for other modules ========
-    
+global base_path
+
 if getattr(sys, 'frozen', False):
     # Running inside PyInstaller .exe
     base_path = sys._MEIPASS
@@ -28,6 +29,13 @@ else:
     # Running from source — your local path
     base_path = os.path.dirname(os.path.dirname(__file__))
     sys.path.insert(0,base_path)
+
+
+
+# ======== For the Icon to appear on the task bar ========
+import ctypes
+agsolaire_app_id = 'mycompany.myproduct.subproduct.version' # arbitrary string
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(agsolaire_app_id)
 
 
 # module_path = r"C:\Users\hmwunguzi2\Documents\AgSolaire-main"
@@ -110,6 +118,15 @@ class CameraApp(tk.Tk):
             pass
         
         self.title("AgSolaire App")
+
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+            self.iconbitmap(os.path.join(base_path,'icons','Agsolaire_logo.ico'))
+        else:
+            base_path = os.path.dirname(os.path.dirname(__file__))
+            self.iconbitmap(r"C:\Users\hmwunguzi2\Documents\AgSolaire-main\icons\Agsolaire_logo.ico")
+
+        # self.iconphoto(True,tk.PhotoImage(file = r"C:\Users\hmwunguzi2\Documents\AgSolaire-main\Logo.png"))
         # self.geometry("800x600")
         # self.attributes('-fullscreen', True)
         self.state("zoomed")
@@ -142,7 +159,7 @@ class CameraScreen(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
-        camera_index = 0
+        camera_index = 1
         if self.find_camera_index() != None:
             camera_index = self.find_camera_index()[1]
 
@@ -155,13 +172,17 @@ class CameraScreen(tk.Frame):
         btn_frame.pack(pady=10)
 
         ttk.Style().configure('My.TButton', 
-        font=('Helvetica', 15),  # Increase font size
+        font=('Helvetica', 11, "bold"),  # Increase font size
         padding=(10, 5)) 
 
-        capture_btn = ttk.Button(btn_frame, text="Capture Image", command=self.capture_image,style='My.TButton')
+        capture_icon_path = os.path.join(base_path,'icons','camera.png')
+        self.capture_icon = ImageTk.PhotoImage(Image.open(capture_icon_path))
+        capture_btn = ttk.Button(btn_frame, text="Capture Image", command=self.capture_image,style='My.TButton',image=self.capture_icon, compound="left")
         capture_btn.grid(row=0, column=0, padx=5)
 
-        quit_btn = ttk.Button(btn_frame, text="Quit", command=self.quit_app, style='My.TButton')
+        quit_icon_path = os.path.join(base_path,'icons','close.png')
+        self.quit_icon = ImageTk.PhotoImage(Image.open(quit_icon_path))
+        quit_btn = ttk.Button(btn_frame, text="Quit", command=self.quit_app, style='My.TButton',image=self.quit_icon,compound="left")
         quit_btn.grid(row=0, column=1, padx=5)
 
         self.update_frame()
@@ -239,13 +260,17 @@ class ResultScreen(tk.Frame):
 
 
         ttk.Style().configure('My.TButton', 
-        font=('Helvetica', 10),  # Increase font size
+        font=('Helvetica', 11,"bold"),  # Increase font size
         padding=(10, 5))  
         
-        back_btn = ttk.Button(btn_frame, text="Back to Camera", command=self.go_back, style='My.TButton')
+        back_icon_path = os.path.join(base_path,'icons','back.png')
+        self.back_icon = ImageTk.PhotoImage(Image.open(back_icon_path))
+        back_btn = ttk.Button(btn_frame, text="Back to Camera", command=self.go_back, style='My.TButton',image=self.back_icon, compound="left")
         back_btn.pack( pady = 20, padx=20, side ="left")
 
-        infer_btn = ttk.Button(btn_frame, text="Send for Inference", command=self.run_inference_button_click, style='My.TButton')
+        run_model_icon_path = os.path.join(base_path,'icons','scanning.png')
+        self.run_model_icon = ImageTk.PhotoImage(Image.open(run_model_icon_path))
+        infer_btn = ttk.Button(btn_frame, text="Send for Inference", command=self.run_inference_button_click, style='My.TButton', image=self.run_model_icon, compound="left")
         infer_btn.pack(pady = 20, padx=10)
 
         results_label = tk.Frame(self.controls_frame)
@@ -253,22 +278,24 @@ class ResultScreen(tk.Frame):
 
         self.spinner = Spinner(self.controls_frame, size=60, color="#4CAF50", speed=20)
 
-        self.inference_label = tk.Label(results_label, text="", font=("Arial", 12))
+        self.inference_label = tk.Label(results_label, text="", font=("Arial", 10,"bold"))
         self.inference_label.pack(pady=10)
         
-        self.count_label = tk.Label(results_label, text="", font=("Arial", 12))
+        self.count_label = tk.Label(results_label, text="", font=("Arial", 10,"bold"))
         self.count_label.pack(pady=10)
 
-        self.weight_label = tk.Label(results_label, text="", font=("Arial", 12))
+        self.weight_label = tk.Label(results_label, text="", font=("Arial", 10,"bold"))
         self.weight_label.pack(pady=10)
 
-        self.TKW_label = tk.Label(results_label, text="", font=("Arial", 12))
+        self.TKW_label = tk.Label(results_label, text="", font=("Arial", 10,"bold"))
         self.TKW_label.pack(pady=10)
         
-        self.mm_to_pxl_label = tk.Label(results_label, text="", font=("Arial", 12))
+        self.mm_to_pxl_label = tk.Label(results_label, text="", font=("Arial", 10,"bold"))
         self.mm_to_pxl_label.pack(pady=10)
 
-        self.save_results_btn = ttk.Button(self.controls_frame, text="Save Results", command=self.save_results, style='My.TButton')
+        save_icon_path = os.path.join(base_path,'icons','diskette.png')
+        self.save_icon = ImageTk.PhotoImage(Image.open(save_icon_path))
+        self.save_results_btn = ttk.Button(self.controls_frame, text="Save Results", command=self.save_results, style='My.TButton', image = self.save_icon, compound="left")
 
         self.saving_label = tk.Label(self.controls_frame, text="", font=("Arial", 12))
         self.saving_label.pack(pady=20)
@@ -344,7 +371,7 @@ class ResultScreen(tk.Frame):
         # mm per pixel scale calculation
         pixel_to_conversion = seed_measurement(cv2.imread(self.controller.captured_image_path))
         scale_calculation = pixel_to_conversion.calculate_length_width_in_mm()
-        PX_PER_MM = scale_calculation['mm_per_pixel'] if scale_calculation else None
+        PX_PER_MM = round(scale_calculation['mm_per_pixel'],3)if scale_calculation else None
 
         # YOLO Detection
         results = self.yolo_model.predict(source=self.image, conf=0.7)
@@ -441,7 +468,7 @@ class ResultScreen(tk.Frame):
         self.TKW_label.config(text=TKW_string)
         self.mm_to_pxl_label.config(text=mm_to_pxl_string)
 
-        self.save_results_btn.pack( pady = 20, padx=20, side ="left")
+        self.save_results_btn.pack( pady = 20, padx=20, side = "top")
 
         # Cleanup
         del sam_results
@@ -475,7 +502,7 @@ class ResultScreen(tk.Frame):
         cv2.imwrite(masked_image_filename, self.out_with_seed_id)
 
         self.save_results_btn.pack_forget()
-        self.saving_label.config(text="Results saved !!!!")
+        self.saving_label.config(text="Results saved !!!!",font=("Arial", 10,"bold"))
 
 
 if __name__ == "__main__":
