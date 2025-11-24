@@ -159,7 +159,7 @@ class CameraScreen(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
-        camera_index = 1
+        camera_index = 0
         if self.find_camera_index() != None:
             camera_index = self.find_camera_index()[1]
 

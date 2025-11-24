@@ -22,9 +22,9 @@ class scale_reader:
         self._serial = None
 
         # port_name = "Dtech USB Serial Controller"
-        port_name = "Prolific PL2303GT USB Serial"
+        device_names = ["Prolific PL2303GT USB Serial","Dtech USB Serial Controller"]
             
-        port = self.find_device(port_name)
+        port = self.find_device(device_names)
 
          
         #initializing the serial object
@@ -75,13 +75,14 @@ class scale_reader:
             return float(self._serial.readline().decode('utf-8').rstrip('gctgnoz\r\n'))
         
     #autodetect the scale COM port:
-    def find_device(self, device_name):
+    def find_device(self, device_list):
         ports = serial.tools.list_ports.comports()
         for port in ports:
             # desc = port.description.lower()
-            if device_name in port.description:
-                print(f"Found {device_name} at {port.device}")
-                return port.device
+            for device_name in device_list:
+                if device_name in port.description:
+                    print(f"Found {device_name} at {port.device}")
+                    return port.device
         print(" No matching device found.")
         return None
     
