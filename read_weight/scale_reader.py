@@ -60,20 +60,26 @@ class scale_reader:
                 return None
             
             return self._serial.readline().decode('utf-8').strip()
-    
-    #read only the value from the scale 
+            
+
+    # read only the value from the scale 
     def read_weight_as_value(self):
         if self._serial == None:
             print(f"Error happend while initializing serial communication.")
         else:
-            #return the weight with no unit and as a float
+            # return the weight with no unit and as a float
             try:
-                float(self._serial.readline().decode('utf-8').rstrip('gctgnoz\r\n'))
+                line = self._serial.readline().decode('utf-8').strip()
+                parts = line.split()
+                float(parts[2])
             except Exception as e:
                 return None
 
-            return float(self._serial.readline().decode('utf-8').rstrip('gctgnoz\r\n'))
-        
+            line = self._serial.readline().decode('utf-8').strip()
+            parts = line.split()
+            return float(parts[2])
+
+ 
     #autodetect the scale COM port:
     def find_device(self, device_list):
         ports = serial.tools.list_ports.comports()
