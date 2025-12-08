@@ -12,3 +12,21 @@ ERROR:root:Traceback (most recent call last):
     self.tk.mainloop(n)
 KeyboardInterrupt
 
+ERROR:root:Traceback (most recent call last):
+  File "C:\Users\manasa_raghavaraju\Projects\Agsolaire\AgSolaire\main_gui\agsolaire_app.py", line 509, in <module>
+    app = CameraApp()
+  File "C:\Users\manasa_raghavaraju\Projects\Agsolaire\AgSolaire\main_gui\agsolaire_app.py", line 127, in __init__
+    self.iconbitmap(r"C:\Users\hmwunguzi2\Documents\AgSolaire-main\icons\Agsolaire_logo.ico")
+  File "C:\Users\manasa_raghavaraju\AppData\Local\Programs\Python\Python310\lib\tkinter\__init__.py", line 2109, in wm_iconbitmap
+    return self.tk.call('wm', 'iconbitmap', self._w, bitmap)
+_tkinter.TclError: bitmap "C:\Users\hmwunguzi2\Documents\AgSolaire-main\icons\Agsolaire_logo.ico" not defined
+
+ERROR:root:Traceback (most recent call last):
+  File "C:\Users\manasa_raghavaraju\Projects\Agsolaire\AgSolaire\main_gui\agsolaire_app.py", line 509, in <module>
+    app = CameraApp()
+  File "C:\Users\manasa_raghavaraju\Projects\Agsolaire\AgSolaire\main_gui\agsolaire_app.py", line 127, in __init__
+    self.iconbitmap(r"C:\Users\hmwunguzi2\Documents\AgSolaire-main\icons\Agsolaire_logo.ico")
+  File "C:\Users\manasa_raghavaraju\AppData\Local\Programs\Python\Python310\lib\tkinter\__init__.py", line 2109, in wm_iconbitmap
+    return self.tk.call('wm', 'iconbitmap', self._w, bitmap)
+_tkinter.TclError: bitmap "C:\Users\hmwunguzi2\Documents\AgSolaire-main\icons\Agsolaire_logo.ico" not defined
+

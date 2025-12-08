@@ -9,6 +9,7 @@ import cv2
 import csv
 import os
 import sys
+import re
 import usb.core
 import threading
 import copy
@@ -124,7 +125,7 @@ class CameraApp(tk.Tk):
             self.iconbitmap(os.path.join(base_path,'icons','Agsolaire_logo.ico'))
         else:
             base_path = os.path.dirname(os.path.dirname(__file__))
-            self.iconbitmap(r"C:\Users\hmwunguzi2\Documents\AgSolaire-main\icons\Agsolaire_logo.ico")
+            self.iconbitmap(r"C:\Users\manasa_raghavaraju\Projects\Agsolaire\AgSolaire\icons\Agsolaire_logo.ico")
 
         # self.iconphoto(True,tk.PhotoImage(file = r"C:\Users\hmwunguzi2\Documents\AgSolaire-main\Logo.png"))
         # self.geometry("800x600")
@@ -160,8 +161,8 @@ class CameraScreen(tk.Frame):
         super().__init__(parent)
 
         camera_index = 0
-        if self.find_camera_index() != None:
-            camera_index = self.find_camera_index()[1]
+        # if self.find_camera_index() != None:
+        #     camera_index = self.find_camera_index()[1]
 
         self.controller = controller
         self.cap = cv2.VideoCapture(camera_index)
@@ -365,8 +366,23 @@ class ResultScreen(tk.Frame):
 
         # Weight Measurement
         weight_reading = scale_reader.scale_reader()
-        self.seed_weight_wt_unit = weight_reading.read_weight() 
-        self.seed_weight = weight_reading.read_weight_as_value() if weight_reading.read_weight_as_value() != None else 0
+
+        raw_line = weight_reading.read_weight() 
+        value = weight_reading.read_weight_as_value() 
+
+        self.seed_weight = value if value is not None else 0.0
+
+        unit = ""
+        if raw_line:
+            m = re.search(r'([a-zA-Z]+)\s*$', raw_line)
+            if m:
+                unit = m.group(1)
+
+        if not unit:
+            unit = "g"
+
+        self.seed_weight_wt_unit = f"{self.seed_weight:.3f} {unit}"
+
 
         # mm per pixel scale calculation
         pixel_to_conversion = seed_measurement(cv2.imread(self.controller.captured_image_path))
@@ -460,6 +476,7 @@ class ResultScreen(tk.Frame):
 
         seed_count_string = f"seed count: {self.seed_count}"
         weight_string = f"Weight: {self.seed_weight_wt_unit}"
+
         TKW_string = f"Thousand Kernel Weight: {self.TKW}"
         mm_to_pxl_string = f"mm/pxl: {PX_PER_MM}"
 
@@ -490,7 +507,7 @@ class ResultScreen(tk.Frame):
                 "Average_Length_mm": self.avg_length,
                 "Average_Width_mm": self.avg_width,
                 "Total_Seeds": self.seed_count,
-                "Total_Weight": self.seed_weight_wt_unit,
+                "Total_Weight": self.seed_weight,
                 "Thousand_Kernel_Weight": round(self.TKW, 3)
             })
         print(f"[INFO] Results saved to {result_csv_filename}")

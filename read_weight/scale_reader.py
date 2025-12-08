@@ -11,6 +11,7 @@
 ##################################################################
 
 import serial
+import re
 from serial.serialutil import SerialException
 import serial.tools.list_ports
 
@@ -63,21 +64,40 @@ class scale_reader:
             
 
     # read only the value from the scale 
-    def read_weight_as_value(self):
-        if self._serial == None:
-            print(f"Error happend while initializing serial communication.")
-        else:
-            # return the weight with no unit and as a float
-            try:
-                line = self._serial.readline().decode('utf-8').strip()
-                parts = line.split()
-                float(parts[2])
-            except Exception as e:
-                return None
+    # def read_weight_as_value(self):
+    #     if self._serial == None:
+    #         print(f"Error happend while initializing serial communication.")
+    #     else:
+    #         # return the weight with no unit and as a float
+    #         try:
+    #             line = self._serial.readline().decode('utf-8').strip()
+    #             parts = line.split()
+    #             float(parts[2])
+    #         except Exception as e:
+    #             return None
 
-            line = self._serial.readline().decode('utf-8').strip()
-            parts = line.split()
-            return float(parts[2])
+    #         line = self._serial.readline().decode('utf-8').strip()
+    #         parts = line.split()
+    #         return float(parts[2])
+
+    def read_weight_as_value(self):
+        if self._serial is None:
+            print("Error happened while initializing serial communication.")
+            return None
+
+
+        for _ in range(2):
+            try:
+                line = self._serial.readline().decode('utf-8', errors='ignore').strip()
+                match = re.search(r'[-+]?\d+(?:\.\d+)?', line)
+                if match:
+                    return float(match.group(0))
+            except Exception:
+                pass
+
+        return None
+
+
 
  
     #autodetect the scale COM port:

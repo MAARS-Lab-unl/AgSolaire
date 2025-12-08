@@ -3,11 +3,11 @@
 
 a = Analysis(
     ['main_gui\\agsolaire_app.py'],
-    pathex=['C:\\Users\\hmwunguzi2\\Documents\\AgSolaire-main\\read_weight', 'C:\\Users\\hmwunguzi2\\Documents\\AgSolaire-main\\seed_measurement'],
+    pathex=['C:\\Users\\manasa_raghavaraju\\Projects\\Agsolaire\\AgSolaire\\read_weight', 'C:\\Users\\manasa_raghavaraju\\Projects\\Agsolaire\\AgSolaire\\seed_measurement'],
     binaries=[],
-    datas=[('C:\\Users\\hmwunguzi2\\Documents\\AgSolaire-main\\read_weight\\*', 'read_weight'),
-    ('C:\\Users\\hmwunguzi2\\Documents\\AgSolaire-main\\seed_measurement\\*', 'seed_measurement'),
-     ('C:\\Users\\hmwunguzi2\\Documents\\AgSolaire-main\\model','model')],
+    datas=[('C:\\Users\\manasa_raghavaraju\\Projects\\Agsolaire\\AgSolaire\\read_weight\\*', 'read_weight'),
+    ('C:\\Users\\manasa_raghavaraju\\Projects\\Agsolaire\\AgSolaire\\seed_measurement\\*', 'seed_measurement'),
+     ('C:\\Users\\manasa_raghavaraju\\Projects\\Agsolaire\\AgSolaire\\model','model')],
     hiddenimports=['serial','serial.tools.list_ports','usb.core'],
     hookspath=[],
     hooksconfig={},
