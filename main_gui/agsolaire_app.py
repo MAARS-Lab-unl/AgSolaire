@@ -68,16 +68,11 @@ print(f"[INFO] Run folder created: {run_folder}")
 result_csv_filename = os.path.join(run_folder, f"result_{run_timestamp}.csv")
 with open(result_csv_filename, mode='w', newline='') as result_file:
     fieldnames = ["Sample ID","Average_Length_mm", "Average_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight"]
+    # fieldnames = ["Sample ID", "Average_Length_mm", "Average_Width_mm", "Total_Length_mm", "Total_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight"]
     writer = csv.DictWriter(result_file, fieldnames=fieldnames)
     writer.writeheader()
 print(f"[INFO] Results saved to {result_csv_filename}")
 
-# ======== Create file for information for individual seed information ========
-# seed_csv_filename = os.path.join(run_folder, f"seed_measurements_{run_timestamp}.csv")
-# with open(seed_csv_filename, mode='w', newline='') as file:
-#     writer = csv.DictWriter(file, fieldnames=["Seed_ID", "Length_mm", "Width_mm"])
-#     writer.writeheader()
-# print(f"[INFO] Seed metrics saved to {seed_csv_filename}")
 
 #Spinning Progress bar class
 class Spinner(tk.Canvas):
@@ -156,50 +151,93 @@ class CameraApp(tk.Tk):
         frame.tkraise()
 
 
+
 class CameraScreen(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
-        camera_index = 0
-        # if self.find_camera_index() != None:
-        #     camera_index = self.find_camera_index()[1]
-
         self.controller = controller
-        self.cap = cv2.VideoCapture(camera_index)
+
+        # Find available cameras
+        self.available_cameras = self.find_available_cameras(max_tested=10)
+        if not self.available_cameras:
+            self.available_cameras = [0]
+
+        self.current_camera_index = self.available_cameras[0]
+
+        # Open initial camera
+        self.cap = cv2.VideoCapture(self.current_camera_index)
+
         self.label = tk.Label(self)
-        self.label.pack(pady = 20)
+        self.label.pack(pady=20)
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=10)
 
-        ttk.Style().configure('My.TButton', 
-        font=('Helvetica', 11, "bold"),  # Increase font size
-        padding=(10, 5)) 
+        ttk.Style().configure('My.TButton', font=('Helvetica', 11, "bold"), padding=(10, 5))
 
-        capture_icon_path = os.path.join(base_path,'icons','camera.png')
+        # Capture button
+        capture_icon_path = os.path.join(base_path, 'icons', 'camera.png')
         self.capture_icon = ImageTk.PhotoImage(Image.open(capture_icon_path))
-        capture_btn = ttk.Button(btn_frame, text="Capture Image", command=self.capture_image,style='My.TButton',image=self.capture_icon, compound="left")
+        capture_btn = ttk.Button(btn_frame, text="Capture Image", command=self.capture_image, style='My.TButton', image=self.capture_icon, compound="left")
         capture_btn.grid(row=0, column=0, padx=5)
 
-        quit_icon_path = os.path.join(base_path,'icons','close.png')
+        # Display labels like "Camera 0", "Camera 1", ...
+        camera_labels = [f"Camera {idx}" for idx in self.available_cameras]
+        self.selected_camera = tk.StringVar(value=camera_labels[0])
+
+        self.camera_combo = ttk.Combobox(btn_frame, textvariable=self.selected_camera, values=camera_labels, state="readonly", width=12)
+        self.camera_combo.grid(row=0, column=1, padx=5)
+
+        # When selection changes, switch camera
+        self.camera_combo.bind("<<ComboboxSelected>>", self.on_camera_change)
+
+        # Quit button
+        quit_icon_path = os.path.join(base_path, 'icons', 'close.png')
         self.quit_icon = ImageTk.PhotoImage(Image.open(quit_icon_path))
-        quit_btn = ttk.Button(btn_frame, text="Quit", command=self.quit_app, style='My.TButton',image=self.quit_icon,compound="left")
-        quit_btn.grid(row=0, column=1, padx=5)
+        quit_btn = ttk.Button(btn_frame, text="Quit", command=self.quit_app, style='My.TButton', image=self.quit_icon, compound="left")
+        quit_btn.grid(row=0, column=2, padx=5)
 
         self.update_frame()
 
+    # Camera switching logic
+    def on_camera_change(self, event=None):
+        """Called when user picks a different camera from the dropdown."""
+        label = self.selected_camera.get()         
+        idx_str = label.split()[-1]     
+        try:
+            new_index = int(idx_str)
+        except ValueError:
+            return
+
+        if new_index == self.current_camera_index:
+            return
+
+        # Release current camera and open the new one
+        if self.cap is not None:
+            self.cap.release()
+
+        self.cap = cv2.VideoCapture(new_index)
+        if self.cap.isOpened():
+            self.current_camera_index = new_index
+            print(f"[INFO] Switched to camera index {new_index}")
+        else:
+            print(f"[WARN] Unable to open camera index {new_index}")
+            # trying to reopen old one
+            self.cap = cv2.VideoCapture(self.current_camera_index)
+
     def update_frame(self):
-        ret, frame = self.cap.read()
-        if ret:
-            
-            self.current_frame = frame
-            frame = cv2.resize(frame, (800,600))
-            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(img)
-            imgtk = ImageTk.PhotoImage(image=img)
-            self.label.imgtk = imgtk
-            self.label.configure(image=imgtk)
-  
+        if self.cap is not None:
+            ret, frame = self.cap.read()
+            if ret:
+                self.current_frame = frame
+                frame = cv2.resize(frame, (800, 600))
+                img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                img = Image.fromarray(img)
+                imgtk = ImageTk.PhotoImage(image=img)
+                self.label.imgtk = imgtk
+                self.label.configure(image=imgtk)
+
         self.after(10, self.update_frame)
 
     def capture_image(self):
@@ -210,35 +248,19 @@ class CameraScreen(tk.Frame):
             self.controller.show_frame(ResultScreen)
 
     def quit_app(self):
-        self.cap.release()
+        if self.cap is not None:
+            self.cap.release()
         self.controller.destroy()
-    
-    def find_camera_index(self):
-        """Check if a USB device with given VID/PID is connected."""
-        #camera vendor ID and Product ID
-        VID = 0X0C45
-        PID = 0x6366
-        dev = usb.core.find(idVendor=VID, idProduct=PID) 
-        camera_indices = list()
 
-        if dev:
-            print("A Camera is found!")
-            
-            for i in range(10):
-                cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)  # use DirectShow backend
-                if cap.isOpened():
-                    ret,frame = cap.read()
-                    if ret:
-                        cap.release()
-                        camera_indices.append(i)
-                    else:
-                        continue
+    def find_available_cameras(self, max_tested=10):
+        indices = []
+        for i in range(max_tested):
+            cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
+            if cap.isOpened():
+                indices.append(i)
                 cap.release()
-            return camera_indices
-                      
-        else:
-            print("NO CAMERA FOUND!!, PLEASE CHECK IF THE CAMERA IS CONNECTED")
-            return None
+        print(f"[INFO] Available cameras: {indices}")
+        return indices
 
 
 class ResultScreen(tk.Frame):
@@ -350,26 +372,23 @@ class ResultScreen(tk.Frame):
 
     def run_inference(self):
 
+        # Load models
         if getattr(sys, 'frozen', False):
             base_path = sys._MEIPASS
             self.yolo_model = YOLO(os.path.join(base_path, "model", "yolo_detection_model.pt"))
-            self.sam_model = SAM(os.path.join(base_path, "model", "mobile_sam.pt"))
+            self.sam_model  = SAM(os.path.join(base_path, "model", "mobile_sam.pt"))
         else:
             base_path = os.path.dirname(os.path.dirname(__file__))
             self.yolo_model = YOLO(os.path.join(base_path, "model", "yolo_detection_model.pt"))
-            self.sam_model = SAM(os.path.join(base_path, "model", "mobile_sam.pt"))
+            self.sam_model  = SAM(os.path.join(base_path, "model", "mobile_sam.pt"))
 
-
-        self.image = self.controller.captured_image_path
-        self.image = cv2.imread(self.image)
-        self.image = cv2.resize(self.image, (1024, 1024))
+        # Read the captured image once
+        self.image = cv2.imread(self.controller.captured_image_path)
 
         # Weight Measurement
         weight_reading = scale_reader.scale_reader()
-
-        raw_line = weight_reading.read_weight() 
-        value = weight_reading.read_weight_as_value() 
-
+        raw_line = weight_reading.read_weight()
+        value    = weight_reading.read_weight_as_value()
         self.seed_weight = value if value is not None else 0.0
 
         unit = ""
@@ -377,21 +396,22 @@ class ResultScreen(tk.Frame):
             m = re.search(r'([a-zA-Z]+)\s*$', raw_line)
             if m:
                 unit = m.group(1)
-
         if not unit:
             unit = "g"
 
         self.seed_weight_wt_unit = f"{self.seed_weight:.3f} {unit}"
 
+        # mm per pixel scale calculation on the SAME image
+        pixel_to_conversion = seed_measurement(self.image)
+        scale_calculation   = pixel_to_conversion.calculate_length_width_in_mm()
 
-        # mm per pixel scale calculation
-        pixel_to_conversion = seed_measurement(cv2.imread(self.controller.captured_image_path))
-        scale_calculation = pixel_to_conversion.calculate_length_width_in_mm()
-        PX_PER_MM = round(scale_calculation['mm_per_pixel'],3)if scale_calculation else None
+        self.mm_per_pixel = None
+        if scale_calculation and "mm_per_pixel" in scale_calculation:
+            self.mm_per_pixel = scale_calculation["mm_per_pixel"]
 
-        # YOLO Detection
+        #YOLO Detection on the SAME image
         results = self.yolo_model.predict(source=self.image, conf=0.7)
-        boxes = results[0].boxes.xywh.cpu().numpy()
+        boxes   = results[0].boxes.xywh.cpu().numpy()
         self.seed_count = len(boxes)
 
         # Thousand Kernel Weight
@@ -400,16 +420,16 @@ class ResultScreen(tk.Frame):
         # SAM Segmentation
         sam_results = self.sam_model.predict(self.image, points=boxes[:, :2])
 
-        overlay = self.image.copy()
+        overlay              = self.image.copy()
         overlay_with_seed_id = self.image.copy()
-        seed_id = 0
+        seed_id   = 0
         seed_data = []
 
         for r in sam_results:
             masks = r.masks.data.cpu().numpy()
             for mask in masks:
                 seed_id += 1
-                mask = (mask > 0.5).astype(np.uint8)  # ensure binary mask
+                mask = (mask > 0.5).astype(np.uint8)
 
                 # Find contour
                 contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -417,75 +437,92 @@ class ResultScreen(tk.Frame):
                     continue
 
                 cnt = max(contours, key=cv2.contourArea)
-
-                # ---- Fit ellipse instead of rectangle ----
-                if len(cnt) < 5:   # cv2.fitEllipse requires >=5 points
+                if len(cnt) < 5:
                     continue
 
-                ellipse = cv2.fitEllipse(cnt)   # (center(x,y), (major_axis, minor_axis), angle)
+                ellipse = cv2.fitEllipse(cnt)   # (center, (MA, ma), angle)
                 (cx, cy), (MA, ma), angle = ellipse
 
                 # Major = length, Minor = width
                 length_px = max(MA, ma)
                 width_px  = min(MA, ma)
 
-                # Convert to mm if calibration known
-                length_mm = length_px / PX_PER_MM if PX_PER_MM else None
-                width_mm  = width_px  / PX_PER_MM if PX_PER_MM else None
+                # Convert to mm using mm_per_pixel
+                if self.mm_per_pixel:
+                    length_mm = length_px * self.mm_per_pixel
+                    width_mm  = width_px  * self.mm_per_pixel
+                else:
+                    length_mm = None
+                    width_mm  = None
 
-                cv2.ellipse(overlay, ellipse, (0, 255,0), 4)
+                cv2.ellipse(overlay, ellipse, (0, 255, 0), 4)
                 cv2.circle(overlay, (int(cx), int(cy)), 4, (0, 255, 0), -1)
 
                 seed_data.append({
                     "Seed_ID": seed_id,
-                    "Length_mm": round(length_mm, 3) if length_mm else None,
-                    "Width_mm": round(width_mm, 3) if width_mm else None
+                    "Length_mm": round(length_mm, 3) if length_mm is not None else None,
+                    "Width_mm":  round(width_mm,  3) if width_mm  is not None else None
                 })
-                seed_label = f"id:{seed_id}"
-                cv2.putText(overlay_with_seed_id, f"{seed_label}", (int(cx)+2, int(cy)-10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
 
-        #creating image masked with results
+                seed_label = f"id:{seed_id}"
+                cv2.putText(
+                    overlay_with_seed_id,
+                    seed_label,
+                    (int(cx) + 2, int(cy) - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 0, 255),
+                    2
+                )
+
+        # Create overlay images for display (now we resize ONLY for GUI)
         out = cv2.addWeighted(self.image, 0.5, overlay, 0.5, 0)
         self.out_with_seed_id = cv2.addWeighted(out, 0.7, overlay_with_seed_id, 0.3, 0.3)
-        out = cv2.resize(out, self.image_size)
+
+        out_resized = cv2.resize(out, self.image_size)
         self.out_with_seed_id = cv2.resize(self.out_with_seed_id, self.image_size)
 
-        # Compute Summary Statistics
-        valid_lengths = [s["Length_mm"] for s in seed_data if s["Length_mm"]]
-        valid_widths = [s["Width_mm"] for s in seed_data if s["Width_mm"]]
+        # Compute totals and averages
+        valid_lengths = [s["Length_mm"] for s in seed_data if s["Length_mm"] is not None]
+        valid_widths  = [s["Width_mm"]  for s in seed_data if s["Width_mm"]  is not None]
 
-        self.avg_length = round(sum(valid_lengths) / len(valid_lengths), 3) if valid_lengths else 0.0
-        self.avg_width = round(sum(valid_widths) / len(valid_widths), 3) if valid_widths else 0.0
+        self.total_length_mm = round(sum(valid_lengths), 3) if valid_lengths else 0.0
+        self.total_width_mm  = round(sum(valid_widths),  3) if valid_widths  else 0.0
 
+        self.avg_length = round(self.total_length_mm / len(valid_lengths), 3) if valid_lengths else 0.0
+        self.avg_width  = round(self.total_width_mm  / len(valid_widths),  3) if valid_widths  else 0.0
 
-        # Display Overlay on GUI
-        inference_image = cv2.cvtColor(out,cv2.COLOR_BGR2RGB)
+        logging.info(
+            f"Seeds={self.seed_count}, len(valid_lengths)={len(valid_lengths)}, "
+            f"total_length_mm={self.total_length_mm}, avg_length_mm={self.avg_length}, "
+            f"total_width_mm={self.total_width_mm}, avg_width_mm={self.avg_width}, "
+            f"mm_per_pixel={self.mm_per_pixel}"
+        )
+
+        # 10) Display overlay on GUI
+        inference_image = cv2.cvtColor(out_resized, cv2.COLOR_BGR2RGB)
         inference_image = Image.fromarray(inference_image)
 
-        # remove progressbar 
         self.spinner.pack_forget()
-        
-        #Update label
         self.inference_label.config(text="Inference Completed !!!")
 
-        # img = Image.open(out).resize((800, 600))
         imgtk = ImageTk.PhotoImage(inference_image)
         self.image_label.imgtk = imgtk
         self.image_label.config(image=imgtk)
 
         seed_count_string = f"seed count: {self.seed_count}"
-        weight_string = f"Weight: {self.seed_weight_wt_unit}"
+        weight_string     = f"Weight: {self.seed_weight_wt_unit}"
+        TKW_string        = f"Thousand Kernel Weight: {self.TKW}"
+        mm_to_pxl_string  = (
+            f"mm/pxl: {self.mm_per_pixel:.3f}" if self.mm_per_pixel else "mm/pxl: None"
+        )
 
-        TKW_string = f"Thousand Kernel Weight: {self.TKW}"
-        mm_to_pxl_string = f"mm/pxl: {PX_PER_MM}"
-
-        self.count_label.config(text=seed_count_string )
+        self.count_label.config(text=seed_count_string)
         self.weight_label.config(text=weight_string)
         self.TKW_label.config(text=TKW_string)
         self.mm_to_pxl_label.config(text=mm_to_pxl_string)
 
-        self.save_results_btn.pack( pady = 20, padx=20, side = "top")
+        self.save_results_btn.pack(pady=20, padx=20, side="top")
 
         # Cleanup
         del sam_results
@@ -501,11 +538,14 @@ class ResultScreen(tk.Frame):
         # Save Result CSV
         with open(result_csv_filename, mode='a', newline='') as result_file:
             fieldnames = ["Sample ID","Average_Length_mm", "Average_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight"]
+            # fieldnames = ["Sample ID", "Average_Length_mm", "Average_Width_mm", "Total_Length_mm", "Total_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight"]
             writer = csv.DictWriter(result_file, fieldnames=fieldnames)
             writer.writerow({
                 "Sample ID":self.sample_ID,
                 "Average_Length_mm": self.avg_length,
                 "Average_Width_mm": self.avg_width,
+                # "Total_Length_mm": self.total_length_mm,
+                # "Total_Width_mm": self.total_width_mm,
                 "Total_Seeds": self.seed_count,
                 "Total_Weight": self.seed_weight,
                 "Thousand_Kernel_Weight": round(self.TKW, 3)
