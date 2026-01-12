@@ -23,9 +23,11 @@ class scale_reader:
         self._serial = None
 
         # port_name = "Dtech USB Serial Controller"
-        device_names = ["Prolific PL2303GT USB Serial","Dtech USB Serial Controller"]
+        device_names = ["Prolific PL2303GT USB Serial","Dtech USB Serial Controller", "USB-SERIAL CH340"]
             
         port = self.find_device(device_names)
+
+        # print(f"port: {port}")
 
          
         #initializing the serial object
@@ -125,3 +127,6 @@ if __name__ == '__main__':
 
     while True:
         print(scale.read_weight_as_value())
+        # print(scale.read_weight())
+        # pass
+
