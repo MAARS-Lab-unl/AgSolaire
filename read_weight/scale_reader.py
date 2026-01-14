@@ -113,6 +113,7 @@ class scale_reader:
                     return port.device
         print(" No matching device found.")
         return None
+
     
     #desctructor
     def __del__(self):

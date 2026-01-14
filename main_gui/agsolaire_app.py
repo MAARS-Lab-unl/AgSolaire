@@ -1,21 +1,5 @@
-import tkinter as tk
-from tkinter import ttk,font,simpledialog
-from ctypes import windll
-from PIL import Image, ImageTk
-from ultralytics import YOLO, SAM, FastSAM
-import numpy as np
-import torch
-import cv2
-import csv
 import os
 import sys
-import re
-import usb.core
-import threading
-import copy
-from datetime import datetime
-
-import traceback, logging
 
 # ======== adding path for other modules ========
 global base_path
@@ -31,6 +15,23 @@ else:
     base_path = os.path.dirname(os.path.dirname(__file__))
     sys.path.insert(0,base_path)
 
+import tkinter as tk
+from tkinter import ttk,font,simpledialog
+from ctypes import windll
+from PIL import Image, ImageTk
+from ultralytics import YOLO, SAM, FastSAM
+from read_gps.gps_reader import GPSReader
+import numpy as np
+import torch
+import cv2
+import csv
+import re
+import usb.core
+import threading
+import copy
+from datetime import datetime
+
+import traceback, logging
 
 
 # ======== For the Icon to appear on the task bar ========
@@ -67,7 +68,7 @@ print(f"[INFO] Run folder created: {run_folder}")
 # ======== Create file for saving results ========
 result_csv_filename = os.path.join(run_folder, f"result_{run_timestamp}.csv")
 with open(result_csv_filename, mode='w', newline='') as result_file:
-    fieldnames = ["Sample ID","Average_Length_mm", "Average_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight"]
+    fieldnames = ["Sample ID","Average_Length_mm", "Average_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight", "Latitude", "Longitude", "GPS_UTC", "GPS_Source"]
     # fieldnames = ["Sample ID", "Average_Length_mm", "Average_Width_mm", "Total_Length_mm", "Total_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight"]
     writer = csv.DictWriter(result_file, fieldnames=fieldnames)
     writer.writeheader()
@@ -537,9 +538,26 @@ class ResultScreen(tk.Frame):
 
         # Save Result CSV
         with open(result_csv_filename, mode='a', newline='') as result_file:
-            fieldnames = ["Sample ID","Average_Length_mm", "Average_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight"]
+            fieldnames = ["Sample ID","Average_Length_mm", "Average_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight", "Latitude", "Longitude", "GPS_UTC", "GPS_Source"]
             # fieldnames = ["Sample ID", "Average_Length_mm", "Average_Width_mm", "Total_Length_mm", "Total_Width_mm", "Total_Seeds", "Total_Weight", "Thousand_Kernel_Weight"]
             writer = csv.DictWriter(result_file, fieldnames=fieldnames)
+            gps_lat = ""
+            gps_lon = ""
+            gps_utc = ""
+            gps_source = ""
+
+            try:
+                gps = GPSReader()  # defaults to COM5
+                fix = gps.get_fix(max_wait_sec=5)
+                gps.close()
+
+                if fix:
+                    gps_lat = fix.get("latitude", "")
+                    gps_lon = fix.get("longitude", "")
+                    gps_utc = fix.get("utc", "")
+                    gps_source = fix.get("source", "")
+            except Exception as e:
+                logging.error(f"GPS error: {e}", exc_info=True)
             writer.writerow({
                 "Sample ID":self.sample_ID,
                 "Average_Length_mm": self.avg_length,
@@ -548,7 +566,11 @@ class ResultScreen(tk.Frame):
                 # "Total_Width_mm": self.total_width_mm,
                 "Total_Seeds": self.seed_count,
                 "Total_Weight": self.seed_weight,
-                "Thousand_Kernel_Weight": round(self.TKW, 3)
+                "Thousand_Kernel_Weight": round(self.TKW, 3),
+                "Latitude": gps_lat,
+                "Longitude": gps_lon,
+                "GPS_UTC": gps_utc,
+                "GPS_Source": gps_source,
             })
         print(f"[INFO] Results saved to {result_csv_filename}")
 
