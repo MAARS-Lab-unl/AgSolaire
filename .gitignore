@@ -3,4 +3,6 @@ dist/
 Results/
 venv/
 # agsolaire_app.spec
+__pycache__/
+*.pyc
 app_error.log

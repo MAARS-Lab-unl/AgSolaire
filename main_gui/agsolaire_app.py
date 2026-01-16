@@ -548,7 +548,7 @@ class ResultScreen(tk.Frame):
 
             try:
                 gps = GPSReader()  # defaults to COM5
-                fix = gps.get_fix(max_wait_sec=5)
+                fix = gps.get_fix(max_wait_sec=30)
                 gps.close()
 
                 if fix:
