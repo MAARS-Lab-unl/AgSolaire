@@ -30,3 +30,12 @@ ERROR:root:Traceback (most recent call last):
     return self.tk.call('wm', 'iconbitmap', self._w, bitmap)
 _tkinter.TclError: bitmap "C:\Users\hmwunguzi2\Documents\AgSolaire-main\icons\Agsolaire_logo.ico" not defined
 
+ERROR:root:GPS error: GPS COM port not found. Plug in GPS receiver and try again.
+Traceback (most recent call last):
+  File "C:\Users\manasa_raghavaraju\Projects\Agsolaire\AgSolaire\main_gui\agsolaire_app.py", line 551, in save_results
+    fix = gps.get_fix(max_wait_sec=30)
+  File "C:\Users\manasa_raghavaraju\Projects\Agsolaire\AgSolaire\read_gps\gps_reader.py", line 94, in get_fix
+    self.open()
+  File "C:\Users\manasa_raghavaraju\Projects\Agsolaire\AgSolaire\read_gps\gps_reader.py", line 76, in open
+    raise RuntimeError("GPS COM port not found. Plug in GPS receiver and try again.")
+RuntimeError: GPS COM port not found. Plug in GPS receiver and try again.
