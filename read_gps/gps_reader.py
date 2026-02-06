@@ -42,7 +42,7 @@ class GPSReader:
                     print(f"[GPS] Found by name: {p.description} at {p.device}")
                     return p.device
 
-        # 2) Fallback: probe ports for NMEA output (works on your tablet)
+        # 2) Fallback: probe ports for NMEA output (works on tablet)
         # Skip obvious scale adapters
         skip_keywords = ["ch340", "prolific", "dtech", "pl2303"]
         candidate_ports = []
