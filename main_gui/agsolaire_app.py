@@ -426,7 +426,8 @@ class ResultScreen(tk.Frame):
         if scale_calculation and "mm_per_pixel" in scale_calculation:
             self.mm_per_pixel = scale_calculation["mm_per_pixel"]
 
-        results = self.yolo_model.predict(source=self.image, conf=0.7)
+        # results = self.yolo_model.predict(source=self.image, conf=0.7)
+        results = self.yolo_model.predict(source=self.image, conf=0.5)
         boxes = results[0].boxes.xywh.cpu().numpy()
         self.seed_count = len(boxes)
 
