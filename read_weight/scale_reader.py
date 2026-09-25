@@ -23,7 +23,7 @@ class scale_reader:
         self._serial = None
 
         # port_name = "Dtech USB Serial Controller"
-        device_names = ["Prolific PL2303GT USB Serial","Dtech USB Serial Controller", "USB-SERIAL CH340"]
+        device_names = ["Prolific PL2303GT USB Serial","Dtech USB Serial Controller", "USB-SERIAL CH340", "USB Serial Port"]
             
         port = self.find_device(device_names)
 
@@ -103,17 +103,30 @@ class scale_reader:
 
  
     #autodetect the scale COM port:
+    # def find_device(self, device_list):
+    #     ports = serial.tools.list_ports.comports()
+    #     for port in ports:
+    #         # desc = port.description.lower()
+    #         for device_name in device_list:
+    #             if device_name in port.description:
+    #                 print(f"Found {device_name} at {port.device}")
+    #                 return port.device
+    #     print(" No matching device found.")
+    #     return None
+
     def find_device(self, device_list):
         ports = serial.tools.list_ports.comports()
+
         for port in ports:
-            # desc = port.description.lower()
+            desc = port.description.lower()
+
             for device_name in device_list:
-                if device_name in port.description:
+                if device_name.lower() in desc:
                     print(f"Found {device_name} at {port.device}")
                     return port.device
-        print(" No matching device found.")
-        return None
 
+        print("No matching device found.")
+        return None
     
     #desctructor
     def __del__(self):
