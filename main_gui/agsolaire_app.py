@@ -355,6 +355,94 @@ class ResultScreen(tk.Frame):
         self.saving_label = tk.Label(self.controls_frame, text="", font=("Arial", 12))
         self.saving_label.pack(pady=20)
 
+                # ===== Current Run Results Table =====
+        self.results_table_frame = tk.LabelFrame(
+            self.controls_frame,
+            text="Current Run Results",
+            font=("Arial", 11, "bold"),
+            padx=10,
+            pady=10
+        )
+        # self.results_table_frame.pack(
+        #     fill="both",
+        #     expand=True,
+        #     padx=10,
+        #     pady=10
+        # )
+
+        columns = (
+            "sample_id",
+            "avg_length",
+            "avg_width",
+            "seed_count",
+            "weight",
+            "tkw",
+            "latitude",
+            "longitude",
+            "gps_utc",
+            "gps_source"
+        )
+
+        self.results_table = ttk.Treeview(
+            self.results_table_frame,
+            columns=columns,
+            show="headings",
+            height=8
+        )
+
+        self.results_scrollbar = ttk.Scrollbar(
+            self.results_table_frame,
+            orient="vertical",
+            command=self.results_table.yview
+        )
+
+        self.results_h_scrollbar = ttk.Scrollbar(
+            self.results_table_frame,
+            orient="horizontal",
+            command=self.results_table.xview
+        )
+
+        self.results_table.configure(
+            yscrollcommand=self.results_scrollbar.set,
+            xscrollcommand=self.results_h_scrollbar.set
+        )
+
+        self.results_table.heading("sample_id", text="Sample ID")
+        self.results_table.heading("avg_length", text="Avg Length (mm)")
+        self.results_table.heading("avg_width", text="Avg Width (mm)")
+        self.results_table.heading("seed_count", text="Seeds")
+        self.results_table.heading("weight", text="Weight")
+        self.results_table.heading("tkw", text="TKW")
+        self.results_table.heading("latitude", text="Latitude")
+        self.results_table.heading("longitude", text="Longitude")
+        self.results_table.heading("gps_utc", text="GPS UTC")
+        self.results_table.heading("gps_source", text="GPS Source")
+
+
+        self.results_table.column("sample_id", width=100, anchor="center")
+        self.results_table.column("avg_length", width=110, anchor="center")
+        self.results_table.column("avg_width", width=110, anchor="center")
+        self.results_table.column("seed_count", width=70, anchor="center")
+        self.results_table.column("weight", width=90, anchor="center")
+        self.results_table.column("tkw", width=90, anchor="center")
+        self.results_table.column("latitude", width=100, anchor="center")
+        self.results_table.column("longitude", width=100, anchor="center")
+        self.results_table.column("gps_utc", width=120, anchor="center")
+        self.results_table.column("gps_source", width=90, anchor="center")
+
+
+        self.results_scrollbar.pack(side="right", fill="y")
+        self.results_h_scrollbar.pack(side="bottom", fill="x")
+        self.results_table.pack(side="left", fill="both", expand=True)
+
+        # Button to open the permanent CSV results file
+        self.open_results_btn = tk.Button(
+            self.controls_frame,
+            text="Open Results File",
+            command=self.open_results_file,
+            font=("Arial", 10, "bold")
+        )
+        
         self.image_size = (800, 600)
 
     def tkraise(self, *args, **kwargs):
@@ -560,6 +648,57 @@ class ResultScreen(tk.Frame):
 
         self.save_results_btn.pack_forget()
         self.saving_label.config(text="Results saved !!!!", font=("Arial", 10, "bold"))
+
+        # Show Current Run Results only after a sample has been saved
+        if not self.results_table_frame.winfo_ismapped():
+            self.results_table_frame.pack(
+                fill="both",
+                expand=True,
+                padx=10,
+                pady=10
+            )
+
+        # Show Open Results File button after the first successful save
+        if not self.open_results_btn.winfo_ismapped():
+            self.open_results_btn.pack(pady=(0, 10))
+
+        # Add the successfully saved sample to the Current Run Results table
+        new_row = self.results_table.insert(
+            "",
+            "end",
+            values=(
+                self.sample_ID,
+                self.avg_length,
+                self.avg_width,
+                self.seed_count,
+                round(self.seed_weight, 3),
+                round(self.TKW, 3),
+                gps_lat,
+                gps_lon,
+                gps_utc,
+                gps_source
+            )
+        )
+
+        self.results_table.after(
+            100,
+            lambda row=new_row: self.results_table.see(row)
+        )
+
+    def open_results_file(self):
+        try:
+            if os.path.exists(result_csv_filename):
+                os.startfile(result_csv_filename)
+            else:
+                messagebox.showerror(
+                    "File Not Found",
+                    "The results file could not be found."
+                )
+        except Exception as e:
+            messagebox.showerror(
+                "Error",
+                f"Could not open the results file:\n{e}"
+            )
 
 if __name__ == "__main__":
     import time  # needed for gps_warmup_loop
