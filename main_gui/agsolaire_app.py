@@ -15,7 +15,7 @@ else:
     sys.path.insert(0, base_path)
 
 import tkinter as tk
-from tkinter import ttk, font, simpledialog
+from tkinter import ttk, font, simpledialog, messagebox
 from ctypes import windll
 from PIL import Image, ImageTk
 from ultralytics import YOLO, SAM, FastSAM
@@ -28,6 +28,8 @@ import re
 import usb.core
 import threading
 import copy
+import hid
+import time
 from datetime import datetime
 
 import traceback, logging
@@ -38,6 +40,7 @@ agsolaire_app_id = 'mycompany.myproduct.subproduct.version'  # arbitrary string
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(agsolaire_app_id)
 
 from read_weight import scale_reader
+from read_weight.ej02_scale_reader import EJ02ScaleReader
 from seed_measurement import seed_measurement
 
 # ===== Error logging setup =====
@@ -154,6 +157,14 @@ class CameraApp(tk.Tk):
 
         self.title("AgSolaire App")
 
+        # Start the A&D EJ-02 scale listener
+        self.ej02_reader = EJ02ScaleReader()
+
+        if self.ej02_reader.error:
+            print(f"[SCALE] EJ-02 listener error: {self.ej02_reader.error}")
+        else:
+            print("[SCALE] EJ-02 listener started")
+
         if getattr(sys, 'frozen', False):
             base_path_local = sys._MEIPASS
             self.iconbitmap(os.path.join(base_path_local, 'icons', 'Agsolaire_logo.ico'))
@@ -184,6 +195,152 @@ class CameraApp(tk.Tk):
     def show_frame(self, page):
         frame = self.frames[page]
         frame.tkraise()
+
+    
+    def get_scale_weight(self):
+        """
+        Read from A&D EJ-02 first.
+        Fall back to a compatible serial scale if necessary.
+        Returns (weight, unit).
+        """
+
+        # First: A&D EJ-123 USB HID scale
+        if not self.ej02_reader.error:
+            weight = self.ej02_reader.read_stable_weight()
+
+            if weight is not None:
+                print(f"[SCALE] A&D EJ-123: {weight:.3f} g")
+                return weight, "g"
+
+        # Second: previously supported serial scales
+        try:
+            # Only attempt serial communication when a matching COM port exists
+            device_names = [
+                "Prolific PL2303GT USB Serial",
+                "Dtech USB Serial Controller",
+                "USB-SERIAL CH340",
+                "USB Serial Port"
+            ]
+
+            import serial.tools.list_ports
+
+            available_ports = serial.tools.list_ports.comports()
+
+            if not any(
+                any(name.lower() in port.description.lower() for name in device_names)
+                for port in available_ports
+            ):
+                return None, "g"
+
+            serial_scale = scale_reader.scale_reader()
+
+            if serial_scale._serial is not None:
+                weight = serial_scale.read_weight_as_value()
+
+                if weight is not None:
+                    print(f"[SCALE] Serial scale: {weight:.3f} g")
+                    return weight, "g"
+
+        except Exception as e:
+            print(f"[SCALE] Serial scale error: {e}")
+
+        print("[SCALE] No valid weight available.")
+        return None, "g"
+
+
+    
+    def is_ej02_connected(self):
+        """Check whether the A&D EJ-02 USB interface is connected."""
+        try:
+            return bool(hid.enumerate(0x0DBC, 0x0005))
+        except Exception as e:
+            print(f"[SCALE] EJ-02 detection error: {e}")
+            return False
+
+    def request_ej02_weight(self):
+        """Ask the operator to press PRINT once and capture a new reading."""
+        reader = self.ej02_reader
+
+        if reader.error:
+            messagebox.showerror("Scale Error", str(reader.error))
+            return None
+
+        # Discard any reading received before this sample.
+        with reader.lock:
+            reader.latest_weight = None
+            reader.last_reading_time = None
+            reader.buffer = ""
+
+        dialog = tk.Toplevel(self)
+        dialog.title("A&D EJ-123 - Weight Measurement")
+        dialog.geometry("440x230")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        tk.Label(
+            dialog,
+            text="Please press PRINT on the weighing scale",
+            font=("Arial", 13, "bold"),
+            wraplength=390
+        ).pack(pady=(25, 10))
+
+        tk.Label(
+            dialog,
+            text="Wait for the balance to stabilize, then press PRINT once.",
+            wraplength=390
+        ).pack(pady=5)
+
+        status = tk.Label(
+            dialog,
+            text="Waiting for weight...",
+            font=("Arial", 12),
+            fg="blue"
+        )
+        status.pack(pady=10)
+
+        result = {"weight": None}
+
+        # The EJ-02 acts like a keyboard. Focus this dedicated
+        # field so its output does not enter the Sample ID field.
+        entry = tk.Entry(dialog, width=25)
+        entry.pack()
+        entry.focus_set()
+
+        def check_weight():
+            if not dialog.winfo_exists():
+                return
+
+            # Prefer the reading from our device-specific Raw Input listener.
+            with reader.lock:
+                value = reader.latest_weight
+                received_at = reader.last_reading_time
+
+            if (
+                value is not None
+                and received_at is not None
+                and time.monotonic() - received_at < 5
+            ):
+                result["weight"] = value
+                dialog.destroy()
+                return
+
+            dialog.after(100, check_weight)
+
+        def cancel():
+            dialog.destroy()
+
+        tk.Button(
+            dialog, text="Cancel", command=cancel
+        ).pack(pady=10)
+
+        dialog.protocol("WM_DELETE_WINDOW", cancel)
+        dialog.after(100, check_weight)
+
+        self.wait_window(dialog)
+        return result["weight"]
+
+
 
 class CameraScreen(tk.Frame):
     def __init__(self, parent, controller):
@@ -474,11 +631,42 @@ class ResultScreen(tk.Frame):
 
         torch.cuda.empty_cache()
 
+    
     def run_inference_button_click(self):
-        self.inference_label.config(text="Model Inference running ... !!!!!")
+
+        self.pending_weight = None
+        self.pending_weight_unit = "g"
+        self.use_ej02_for_inference = False
+
+        # A&D EJ-02: request one PRINT reading.
+        if self.controller.is_ej02_connected():
+
+            self.use_ej02_for_inference = True
+
+            weight = self.controller.request_ej02_weight()
+
+            if weight is None:
+                messagebox.showwarning(
+                    "Weight Not Received",
+                    "No weight was captured. Inference was cancelled."
+                )
+                return
+
+            self.pending_weight = weight
+            print(f"[SCALE] A&D EJ-123: {weight:.3f} g")
+
+        # Serial scales do not require the PRINT dialog.
+        self.inference_label.config(
+            text="Model Inference running ... !!!!!"
+        )
         self.spinner.pack(pady=10)
         self.spinner.start()
-        threading.Thread(target=self.run_inference, daemon=True).start()
+
+        threading.Thread(
+            target=self.run_inference,
+            daemon=True
+        ).start()
+
 
     def run_inference(self):
         if getattr(sys, 'frozen', False):
@@ -492,20 +680,27 @@ class ResultScreen(tk.Frame):
 
         self.image = cv2.imread(self.controller.captured_image_path)
 
-        weight_reading = scale_reader.scale_reader()
-        raw_line = weight_reading.read_weight()
-        value = weight_reading.read_weight_as_value()
-        self.seed_weight = value if value is not None else 0.0
+        
+        # Read weight from A&D EJ-123 or previously supported serial scales
+        if self.use_ej02_for_inference:
+            # A&D EJ-123: use weight captured after pressing PRINT
+            value = self.pending_weight
+            unit = self.pending_weight_unit
 
-        unit = ""
-        if raw_line:
-            m = re.search(r'([a-zA-Z]+)\s*$', raw_line)
-            if m:
-                unit = m.group(1)
-        if not unit:
-            unit = "g"
+        else:
+            # Previously supported serial scales: automatic reading
+            value, unit = self.controller.get_scale_weight()
 
-        self.seed_weight_wt_unit = f"{self.seed_weight:.3f} {unit}"
+        self.seed_weight = value
+
+        self.seed_weight_wt_unit = (
+            f"{value:.3f} {unit}"
+            if value is not None
+            else "Unavailable"
+        )
+
+        print(f"[SCALE] Weight for inference: {self.seed_weight_wt_unit}")
+
 
         pixel_to_conversion = seed_measurement(self.image)
         scale_calculation = pixel_to_conversion.calculate_length_width_in_mm()
@@ -518,7 +713,11 @@ class ResultScreen(tk.Frame):
         boxes = results[0].boxes.xywh.cpu().numpy()
         self.seed_count = len(boxes)
 
-        self.TKW = (self.seed_weight / self.seed_count) * 1000 if self.seed_count > 0 else 0
+        self.TKW = (
+            (self.seed_weight / self.seed_count) * 1000
+            if self.seed_weight is not None and self.seed_count > 0
+            else None
+        )
 
         sam_results = self.sam_model.predict(self.image, points=boxes[:, :2])
 
@@ -594,7 +793,13 @@ class ResultScreen(tk.Frame):
 
         self.count_label.config(text=f"seed count: {self.seed_count}")
         self.weight_label.config(text=f"Weight: {self.seed_weight_wt_unit}")
-        self.TKW_label.config(text=f"Thousand Kernel Weight: {self.TKW}")
+        self.TKW_label.config(
+            text=(
+                f"Thousand Kernel Weight: {self.TKW:.3f} g"
+                if self.TKW is not None
+                else "Thousand Kernel Weight: Unavailable"
+            )
+        )
         self.mm_to_pxl_label.config(text=f"mm/pxl: {self.mm_per_pixel:.3f}" if self.mm_per_pixel else "mm/pxl: None")
 
         self.save_results_btn.pack(pady=20, padx=20, side="top")
@@ -633,8 +838,14 @@ class ResultScreen(tk.Frame):
                 "Average_Length_mm": self.avg_length,
                 "Average_Width_mm": self.avg_width,
                 "Total_Seeds": self.seed_count,
-                "Total_Weight": self.seed_weight,
-                "Thousand_Kernel_Weight": round(self.TKW, 3),
+                "Total_Weight": (
+                    round(self.seed_weight, 3)
+                    if self.seed_weight is not None else ""
+                ),
+                "Thousand_Kernel_Weight": (
+                    round(self.TKW, 3)
+                    if self.TKW is not None else ""
+                ),
                 "Latitude": gps_lat,
                 "Longitude": gps_lon,
                 "GPS_UTC": gps_utc,
@@ -671,8 +882,8 @@ class ResultScreen(tk.Frame):
                 self.avg_length,
                 self.avg_width,
                 self.seed_count,
-                round(self.seed_weight, 3),
-                round(self.TKW, 3),
+                round(self.seed_weight, 3) if self.seed_weight is not None else "",
+                round(self.TKW, 3) if self.TKW is not None else "",
                 gps_lat,
                 gps_lon,
                 gps_utc,
